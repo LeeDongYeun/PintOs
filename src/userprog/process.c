@@ -24,6 +24,8 @@
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 
+int argument_count(char *parse);
+
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
@@ -468,4 +470,26 @@ install_page (void *upage, void *kpage, bool writable)
      address, then map our page there. */
   return (pagedir_get_page (t->pagedir, upage) == NULL
           && pagedir_set_page (t->pagedir, upage, kpage, writable));
+}
+
+int
+argument_count(char *parse)
+{
+  char *argv = malloc(128);
+  char *token = NULL;
+  char *address = NULL;
+  int i = 0;
+  
+  strlcpy(argv, parse, strlen(parse));
+  
+  token = strtok_s(argv, " ", &address);
+  
+  while(token != NULL){
+    i++;
+    token = strtok_s(NULL, " ", &address);
+    
+  }
+  free(argv);
+  
+  return i-1;
 }

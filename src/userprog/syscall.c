@@ -15,6 +15,7 @@
 typedef int pid_t;
 
 static void syscall_handler (struct intr_frame *);
+
 void *check_pointer(void *ptr);
 
 void halt(void);
@@ -35,10 +36,6 @@ struct file *get_file(int fd);
 
 struct lock lock_filesys;
 
-/*
-file descriptor로 syscall_init에서 초기화하고
-open함수에서 file을 오픈할 때마다 1씩 증가한다  
-*/
 void
 syscall_init (void) 
 {
@@ -106,29 +103,12 @@ syscall_handler (struct intr_frame *f)
 
 	  	default :
 	  		exit(-1);
-	}
-	
+	}	
 }
 
 void*
 check_pointer(void *ptr){
-	void *result = 0;
-	if(ptr >= PHYS_BASE){
-		exit(-1);
-	}
-
-	else{
-
-		void *pointer = pagedir_get_page(thread_current()->pagedir, ptr);
-		if(!pointer){
-			exit(-1);
-		}
-		else{
-			result = ptr;
-		}
-	}
-
-	return result;
+	return ptr;
 }
 
 /*
@@ -161,23 +141,9 @@ halt(void){
 
 void
 exit(int status){
-	struct thread *curr = thread_current ();
-
-	printf("%s: exit(%d)\n", curr->name, status);
-
-	
-  	struct thread *parent = get_thread(curr->parent_tid);
-  	struct list_elem *e;
-  	for(e=list_begin(&parent->child_list);e!=list_end(&parent->child_list);e=list_next(e))
-  	{
-    struct child* pchild_t = list_entry(e,struct child, elem);
-    if(pchild_t -> pid == curr->tid)
-    {
-      pchild_t -> status = status;
-      break;
-    }
+	struct thread *t = thread_current ();
+ 	printf("%s: exit(%d)\n", t->name, status);
 	thread_exit();
-	}
 }
 
 pid_t
@@ -185,22 +151,18 @@ exec(const char *cmd_line){
 	return process_execute(cmd_line);
 }
 
-
 int
-wait(pid_t pid)
-{
-	return process_wait(pid);
+wait(pid_t pid){
+	process_wait();
 }
 
 bool
 create(const char *file, unsigned initial_size){
 	bool result;
-
-	lock_acquire(&lock_filesys);
+ 	lock_acquire(&lock_filesys);
 	result = filesys_create(file, initial_size);
 	lock_release(&lock_filesys);
-
-	return result;
+ 	return result;
 }
 
 bool
@@ -210,8 +172,7 @@ remove(const char *file){
 	lock_acquire(&lock_filesys);
 	result = filesys_remove(file);
 	lock_release(&lock_filesys);
-
-	return result;
+ 	return result;
 }
 
 /*
@@ -380,6 +341,3 @@ close(int fd){
 		}
 	}
 }
-
-
-

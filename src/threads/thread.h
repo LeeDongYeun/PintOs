@@ -95,10 +95,6 @@ struct thread
     /*[project2]*/
     int fd;                             /*file discriptor [project2-syscall] */
     struct list file_list;              /*list of open file [project2=syscall] */
-    int parent_tid;
-    int wait_tid;
-    struct list child_list;
-    struct list_elem all_elem;
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */

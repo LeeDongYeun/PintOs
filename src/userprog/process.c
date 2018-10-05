@@ -20,15 +20,9 @@
 #include "threads/malloc.h"
 #include "threads/synch.h"
 #include "userprog/syscall.h"
-//#include "userprog/syscall.c"
-
-#define DELIM_CHARS " ";
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
-int argument_count(char **parse);
-void argv_put_stack(char **parse,int count, void **esp);
-struct lock lock_filesys;
 
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
@@ -45,25 +39,12 @@ process_execute (const char *file_name)
   fn_copy = palloc_get_page (0);
   if (fn_copy == NULL)
     return TID_ERROR;
-  
   strlcpy (fn_copy, file_name, PGSIZE);
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy); 
-    return -1;
-
-  struct thread *child_thread = get_thread(tid);
-  struct thread *curr = thread_current();
-  child_thread->parent_tid = curr -> tid;
-
-  struct child *child_t;
-  child_t -> pid = tid;
-  child_t -> is_exited = -1;
-
-  list_push_back(&curr->child_list,&child_t -> elem);
-
   return tid;
 }
 
@@ -72,10 +53,7 @@ process_execute (const char *file_name)
 static void
 start_process (void *f_name)
 {
-  char *buf_1 = (char*)malloc(sizeof(char)*128);
-  strlcpy(buf_1,f_name,128);
-  char *buf_2;
-  char *file_name = strtok_r(buf_1," ",&buf_2);
+  char *file_name = f_name;
   struct intr_frame if_;
   bool success;
 
@@ -84,15 +62,13 @@ start_process (void *f_name)
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
-
-  argv_put_stack(f_name, argument_count(f_name),&if_.esp);
   success = load (file_name, &if_.eip, &if_.esp);
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
-  free(buf_1);
   if (!success) 
     thread_exit ();
+
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
      threads/intr-stubs.S).  Because intr_exit takes all of its
@@ -113,47 +89,12 @@ start_process (void *f_name)
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
 int
-process_wait (tid_t child_tid) 
+process_wait (tid_t child_tid UNUSED) 
 {
-  struct thread *child = get_thread(child_tid);
-  struct list_elem * e;
-  struct thread *curr = thread_current();
-  struct child *child_t;
-  bool buf = false;
+  while(1){
 
-  /*현재 프로세스가 tid 값이 child_tid인 process를 child로 가졌는지 확인한다*/
-  for(e=list_begin(&curr->child_list);e!=list_end(&curr->child_list);e=list_next(e))
-  {
-    child_t = list_entry(e,struct child,elem);
-    if(child_t->pid == child_tid)
-    {
-      buf = true;
-      break;
-    }
   }
-
-  /*자식 프로세스가 존재하는지 확인*/
-  if(!buf)
-  {
-    return -1;
-  }
-  /*자식 프로세스가 이미 종료되었다면 is_exited를 리턴*/
-  else if(child_t->is_exited != -1)
-  {
-    return child_t->is_exited;
-  }
-  /*자식 프로세스가 종료될 때까지 기다렸다가 리턴*/
-  else
-  {
-    curr -> wait_tid = child -> tid;
-    thread_block();
-
-    if (child_t->is_exited != 0)
-    {
-      return -1;
-    }
-    return 0;
-  }
+  return -1;
 }
 
 /* Free the current process's resources. */
@@ -162,35 +103,6 @@ process_exit (void)
 {
   struct thread *curr = thread_current ();
   uint32_t *pd;
-  struct file_descriptor *file_des;
-  struct list_elem *e;
-
-  /*자신의 file을 모두 닫음*/
-  while(!list_empty(&curr->file_list))
-  {
-    file_des= list_entry(list_pop_back(&curr->file_list), struct file_descriptor, elem);
-    lock_acquire(&lock_filesys);
-    file_close(file_des -> file);
-    lock_release(&lock_filesys);
-  }
-
-  /*자신이 가지고 있는 child 구조체를 모두 free시킴*/
-  while(!list_empty(&curr->child_list))
-  {
-    struct child *child_t = list_entry(list_pop_back(&curr->child_list),struct child,elem);
-    free(child_t);
-  }
-
-  /*parent에 저장된 child 구조체의 is_exited 값을 변경*/
-  struct thread *parent = get_thread(curr->parent_tid);
-  for(e=list_begin(&parent->child_list);e!=list_end(&parent->child_list);e=list_next(e))
-  {
-    struct child* pchild_t = list_entry(e,struct child, elem);
-    if(pchild_t -> pid == curr->tid)
-    {
-      pchild_t -> is_exited = 0;
-    }
-  }
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
@@ -208,10 +120,6 @@ process_exit (void)
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }
-  if(parent->wait_tid == curr -> tid)
-  {
-    thread_unblock(parent);
-  }
 }
 
 /* Sets up the CPU for running user code in the current
@@ -535,7 +443,7 @@ setup_stack (void **esp)
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
       if (success)
-        *esp = PHYS_BASE;
+        *esp = PHYS_BASE - 12;
       else
         palloc_free_page (kpage);
     }
@@ -560,79 +468,4 @@ install_page (void *upage, void *kpage, bool writable)
      address, then map our page there. */
   return (pagedir_get_page (t->pagedir, upage) == NULL
           && pagedir_set_page (t->pagedir, upage, kpage, writable));
-}
-
-
-int
-argument_count(char **parse)
-{
-  char *argv = malloc(128);
-  strlcpy(argv,*parse,128);
-  char *address;
-  char *token = strtok_r(argv," ",&address);
-  int i = 0;
-  while(token)
-  {
-    i++;
-    token = strtok_r(NULL," ",&address);
-  }
-  free(argv);
-  return i;
-}
-
-
-void 
-argv_put_stack(char **parse,int count, void **esp)
-{
-  char *argv = malloc(128);
-  strlcpy(argv,*parse,128);
-  char *address;
-  char **buff = (char**)malloc((count+1)*sizeof(char*));
-  char *token = strtok_r(argv," ",&address);
-  char *argv_ptr;
-  int arg_len;
-  int align;
-  int i;
-
-  /*argv를 쪼개서 stack에 집어 넣는다. 집어 넣을 때 
-  stack의 주소값을 buff에 저장한다.*/
-  i = 0;
-  while(token)
-  {
-    arg_len = strlen(token) + 1;
-    *esp = *esp - arg_len;
-    buff[i] = *esp;
-    memcpy(*esp, token, arg_len);
-    i++;
-  } 
-  /*마지막 buff에 0을 집어 넣는다*/
-  buff[count] = 0; 
-
-
-  /*8바이트로 맞추어준다*/
-  align = ((int)*esp) & 3;
-  *esp = *esp - align;
-
-  /*스택에 argv들의 주소값을 집어 넣는다*/
-  for(i=count;i>=0;i--)
-  {
-    *esp = *esp - 4;
-    memcpy(*esp,&argv[i],4);
-  }
-
-  /*스택에 argv의 주소값을 가지고 있는 주소값을 넣는다*/
-  argv_ptr = *esp;
-  *esp = *esp - 4;
-  memcpy(*esp,&argv_ptr,4);
-
-  /*스택에 argv의 개수를 넣는다*/
-  *esp = *esp - 4;
-  memcpy(*esp,&count,4);
-
-  /*return address를 넣는다*/
-  *esp = *esp - 4;
-  memset(*esp,0,4);
-
-  free(buff);
-  free(argv);
 }

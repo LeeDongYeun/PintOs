@@ -17,57 +17,70 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
-#include "threads/malloc.h"
-#include "threads/synch.h"
-#include "userprog/syscall.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 
 int argument_count(char *parse);
-
+void argv_put_stack(char *parse,int count, void **esp);
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
    thread id, or TID_ERROR if the thread cannot be created. */
 tid_t
-process_execute (const char *file_name) 
+process_execute (const char *cmd_line) 
 {
-  char *fn_copy;
+  char *file_name;
   tid_t tid;
+
+  char *argv = malloc(128);
+  char *address = NULL;
+
+  strlcpy(argv, cmd_line, strlen(cmd_line));
 
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
-  fn_copy = palloc_get_page (0);
-  if (fn_copy == NULL)
+  file_name = palloc_get_page (0);
+  if (file_name == NULL)
     return TID_ERROR;
-  strlcpy (fn_copy, file_name, PGSIZE);
+  
+  file_name = strtok_r(argv, " ", &address);
 
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
+  tid = thread_create (file_name, PRI_DEFAULT, start_process, cmd_line);
   if (tid == TID_ERROR)
-    palloc_free_page (fn_copy); 
+    palloc_free_page (file_name); 
+
+  free(argv);
   return tid;
 }
 
 /* A thread function that loads a user process and makes it start
    running. */
 static void
-start_process (void *f_name)
+start_process (void *cmd_line)
 {
-  char *file_name = f_name;
+  char *file_name;
   struct intr_frame if_;
   bool success;
+
+  char *argv = malloc(128);
+  char *address = NULL;
+
+  strlcpy(argv, cmd_line, strlen(cmd_line));
+  file_name = strtok_r(argv, " ", &address);
 
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
-  success = load (file_name, &if_.eip, &if_.esp);
+  success = load (cmd_line, &if_.eip, &if_.esp);
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
+  free(argv);
+
   if (!success) 
     thread_exit ();
 
@@ -93,9 +106,6 @@ start_process (void *f_name)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
-  while(1){
-
-  }
   return -1;
 }
 
@@ -214,7 +224,7 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
    and its initial stack pointer into *ESP.
    Returns true if successful, false otherwise. */
 bool
-load (const char *file_name, void (**eip) (void), void **esp) 
+load (const char *cmd_line, void (**eip) (void), void **esp) 
 {
   struct thread *t = thread_current ();
   struct Elf32_Ehdr ehdr;
@@ -222,6 +232,15 @@ load (const char *file_name, void (**eip) (void), void **esp)
   off_t file_ofs;
   bool success = false;
   int i;
+
+  char *file_name;
+
+  char *argv = malloc(128);
+  char *address = NULL;
+
+  strlcpy(argv, cmd_line, strlen(cmd_line));
+  file_name = strtok_r(argv, " ", &address);
+  free(argv);
 
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create ();
@@ -312,6 +331,8 @@ load (const char *file_name, void (**eip) (void), void **esp)
   /* Set up stack. */
   if (!setup_stack (esp))
     goto done;
+
+  argv_put_stack(cmd_line,argument_count(cmd_line), esp);
 
   /* Start address. */
   *eip = (void (*) (void)) ehdr.e_entry;
@@ -445,7 +466,7 @@ setup_stack (void **esp)
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
       if (success)
-        *esp = PHYS_BASE - 12;
+        *esp = PHYS_BASE;
       else
         palloc_free_page (kpage);
     }
@@ -482,14 +503,76 @@ argument_count(char *parse)
   
   strlcpy(argv, parse, strlen(parse));
   
-  token = strtok_s(argv, " ", &address);
+  token = strtok_r(argv, " ", &address);
   
   while(token != NULL){
     i++;
-    token = strtok_s(NULL, " ", &address);
+    token = strtok_r(NULL, " ", &address);
     
   }
   free(argv);
   
   return i-1;
+}
+
+void 
+argv_put_stack(char *parse,int count, void **esp)
+{
+  char *argv = malloc(128);
+  char *token = NULL;
+  char *address = NULL;
+  char **buff = (char**)malloc((count+1)*sizeof(char*));
+  char *argv_ptr;
+  int arg_len;
+  int align;
+  int i = 0;
+  
+  strlcpy(argv, parse, strlen(parse));
+  
+  token = strtok_r(argv, " ", &address);
+
+  /*argv를 쪼개서 buff에 집어 넣는다*/
+  while(token != NULL)
+  {
+    buff[i] = token;
+    token = strtok_r(NULL, " ", &address);
+    i++;
+  }
+   
+  /*buff에서 끝에서부터 esp에 넣어준다*/ 
+  for(i = count; i>=0;i--){
+    arg_len = strlen(buff[i]) + 1;
+    *esp = *esp - arg_len;
+    memcpy(*esp, buff[i], arg_len);
+    buff[i] = *esp;
+  }
+  
+  /*8바이트로 맞추어준다*/
+  align = ((int)*esp) & 3;
+  *esp = *esp - align;
+
+  /*스택에 argv들의 주소값을 집어 넣는다*/
+  
+  for(i=count;i>=0;i--)
+  {
+    *esp = *esp - 4;
+    memcpy(*esp, &buff[i], 4);
+  }
+  
+  /*스택에 argv의 주소값을 가지고 있는 주소값을 넣는다*/
+  
+  argv_ptr = *esp;
+  *esp = *esp - 4;
+  memcpy(*esp,&argv_ptr,4);
+
+  /*스택에 argv의 개수를 넣는다*/
+  *esp = *esp - 4;
+  memcpy(*esp,&count,4);
+  
+  /*return address를 넣는다*/
+  *esp = *esp - 4;
+  memset(*esp,0,4);
+
+  free(buff);
+  free(argv);
 }

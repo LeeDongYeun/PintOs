@@ -512,7 +512,7 @@ argument_count(char *parse)
   }
   free(argv);
   
-  return i-1;
+  return i;
 }
 
 void 
@@ -540,7 +540,7 @@ argv_put_stack(char *parse,int count, void **esp)
   }
    
   /*buff에서 끝에서부터 esp에 넣어준다*/ 
-  for(i = count; i>=0;i--){
+  for(i = count-1; i>=0;i--){
     arg_len = strlen(buff[i]) + 1;
     *esp = *esp - arg_len;
     memcpy(*esp, buff[i], arg_len);

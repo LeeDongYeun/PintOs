@@ -92,6 +92,10 @@ struct thread
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
 
+    /*[project2]*/
+    int fd;                             /*file discriptor [project2-syscall] */
+    struct list file_list;              /*list of open file [project2=syscall] */
+
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */

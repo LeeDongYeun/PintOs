@@ -1,6 +1,7 @@
 #include "userprog/syscall.h"
 #include <stdio.h>
 #include <syscall-nr.h>
+#include <stdint.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
@@ -98,7 +99,7 @@ syscall_handler (struct intr_frame *f)
 	  		break;
 
 	  	case SYS_CREATE:
-	  		f -> eax = create((char *)get_argv(esp_val+4), (unsigned)check_pointer(esp_val+8));
+	  		f -> eax = create((char *)get_argv(esp_val+4), (unsigned)get_argv(esp_val+8));
 	  		break;
 
 	  	case SYS_REMOVE:

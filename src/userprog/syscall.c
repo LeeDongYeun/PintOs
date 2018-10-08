@@ -35,6 +35,35 @@ struct file *get_file(int fd);
 
 struct lock lock_filesys;
 
+static int 
+get_user (const unit8_t *uaddr)
+{
+	int result;
+	asm ("movl $1f, %0; movzbl %1, %0; 1:"
+		: "=&a" (result) : "m" (*uaddr));
+	return result;
+}
+
+int get_argv(char *ptr)
+{
+	unsigned temp1 = get_user(ptr);
+	unsigned temp2 = get_user(ptr+1);
+	unsigned temp3 = get_user(ptr+2);
+	unsigned temp4 = get_user(ptr+3);;
+	
+	if(temp1 == -1 || temp2 == -1 || temp3 == -1 || temp4 == -1)
+	{
+		exit(-1);
+	}
+	else
+	{
+		return temp1 + (temp2 << 8) + (temp3 << 16) + (temp4 << 24);
+	}
+}
+
+
+
+
 /*
 file descriptor로 syscall_init에서 초기화하고
 open함수에서 file을 오픈할 때마다 1씩 증가한다  
@@ -49,59 +78,59 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f) 
 {
-	int *esp_val = check_pointer(f->esp);
+	int esp_val = get_argv(f->esp);
 	
-	switch(*esp_val){
+	switch(esp_val){
 	  	case SYS_HALT:
 	  		halt();
 	  		break;
 
 	  	case SYS_EXIT:
-	  		exit(*(int *)check_pointer(esp_val+12));
+	  		exit((int)get_argv(esp_val+4));
 	  		break;
 
 	  	case SYS_EXEC:
-	  		f -> eax = (uint32_t) exec(*(char *)check_pointer(esp_val+12));
+	  		f -> eax = (uint32_t) exec((char*)get_argv(esp_val+4));
 	  		break;
 
 	  	case SYS_WAIT:
-	  		f -> eax = (uint32_t) wait((int)check_pointer(esp_val+12));
+	  		f -> eax = (uint32_t) wait((int)get_argv(esp_val+4));
 	  		break;
 
 	  	case SYS_CREATE:
-	  		f -> eax = create((char *)check_pointer(esp_val+12), (unsigned)check_pointer(esp_val+16));
+	  		f -> eax = create((char *)get_argv(esp_val+4), (unsigned)check_pointer(esp_val+8));
 	  		break;
 
 	  	case SYS_REMOVE:
-	  		f -> eax = remove((char *)check_pointer(esp_val+12));
+	  		f -> eax = remove((char *)get_argv(esp_val+4));
 	  		break;
 
 	  	case SYS_OPEN:
-	  		f -> eax = open((char *)check_pointer(esp_val+12));
+	  		f -> eax = open((char *)get_argv(esp_val+4));
 	  		break;
 
 	  	case SYS_FILESIZE:
-	  		f -> eax = filesize((int)check_pointer(esp_val+12));
+	  		f -> eax = filesize((int)get_argv(esp_val+4));
 	  		break;
 
 	  	case SYS_READ:
-	  		f -> eax = read((int)check_pointer(esp_val+12), (void *)check_pointer(esp_val+16), (unsigned)check_pointer(esp_val+20));
+	  		f -> eax = read((int)get_argv(esp_val+4), (void *)get_argv(esp_val+8), (unsigned)get_argv(esp_val+12));
 	  		break;
 
 	  	case SYS_WRITE:
-	  		f -> eax = write((int)check_pointer(esp_val+12), (void *)check_pointer(esp_val+16), (unsigned)check_pointer(esp_val+20));
+	  		f -> eax = write((int)get_argv(esp_val+4), (void *)get_argv(esp_val+8), (unsigned)get_argv(esp_val+12));
 	  		break;
 
 	  	case SYS_SEEK:
-	  		seek((int)check_pointer(esp_val+12), (unsigned)check_pointer(esp_val+16));
+	  		seek((int)get_argv(esp_val+4), (unsigned)get_argv(esp_val+8));
 	  		break;
 
 	  	case SYS_TELL:
-	  		f -> eax = tell((int)check_pointer(esp_val+12));
+	  		f -> eax = tell((int)get_argv(esp_val+4));
 	  		break;
 
 	  	case SYS_CLOSE:
-	  		close((int)check_pointer(esp_val+12));
+	  		close((int)get_argv(esp_val+4));
 	  		break;
 
 	  	default :

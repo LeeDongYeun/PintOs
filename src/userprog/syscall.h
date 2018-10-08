@@ -10,4 +10,6 @@ struct file_descriptor{
 	int fd;
 	struct list_elem elem;
 };
+
+static struct lock lock_filesys;
 #endif /* userprog/syscall.h */

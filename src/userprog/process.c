@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "userprog/syscall.h"
 #include "userprog/gdt.h"
 #include "userprog/pagedir.h"
 #include "userprog/tss.h"
@@ -36,7 +37,7 @@ process_execute (const char *cmd_line)
   char *argv = malloc(128);
   char *address = NULL;
 
-  strlcpy(argv, cmd_line, strlen(cmd_line));
+  strlcpy(argv, cmd_line, strlen(cmd_line)+1);
 
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
@@ -47,11 +48,28 @@ process_execute (const char *cmd_line)
   file_name = strtok_r(argv, " ", &address);
 
   /* Create a new thread to execute FILE_NAME. */
+  printf("%s %s\n",file_name,cmd_line);
   tid = thread_create (file_name, PRI_DEFAULT, start_process, cmd_line);
   if (tid == TID_ERROR)
+  {
     palloc_free_page (file_name); 
+    return -1;
+  }
+
+  struct thread *child_thread = get_thread(tid);
+  struct thread *curr = thread_current();
+  child_thread->parent_tid = curr -> tid;
+
+  struct child *child_t;
+  child_t -> pid = tid;
+  child_t -> is_exited = false;
+  child_t -> status = -1;
+
+  list_push_back(&curr->child_list,&child_t -> elem);
 
   free(argv);
+  printf("process_execute done\n");
+
   return tid;
 }
 
@@ -67,6 +85,8 @@ start_process (void *cmd_line)
   char *argv = malloc(128);
   char *address = NULL;
 
+  printf("adfad\n");
+
   strlcpy(argv, cmd_line, strlen(cmd_line));
   file_name = strtok_r(argv, " ", &address);
 
@@ -76,13 +96,17 @@ start_process (void *cmd_line)
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (cmd_line, &if_.eip, &if_.esp);
+  printf("load successed\n");
 
   /* If load failed, quit. */
-  palloc_free_page (file_name);
+  //palloc_free_page (file_name); -> 현재 여기서 걸림
   free(argv);
 
-  if (!success) 
+  if (!success){
+    palloc_free_page (file_name);
+    printf("palloc free page file name\n");
     thread_exit ();
+  } 
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -106,10 +130,54 @@ start_process (void *cmd_line)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
-  while(1){
+  printf("asdf\n");
+  struct thread *child = get_thread(child_tid);
+  struct list_elem * e;
+  struct thread *curr = thread_current();
+  struct child *child_t;
+  bool buf = false;
 
+  /*현재 프로세스가 tid 값이 child_tid인 process를 child로 가졌는지 확인한다*/
+  for(e=list_begin(&curr->child_list);e!=list_end(&curr->child_list);e=list_next(e))
+  {
+    child_t = list_entry(e,struct child,elem);
+    if(child_t->pid == child_tid)
+    {
+      buf = true;
+      break;
+    }
   }
-  return -1;
+  printf("sdfg\n");
+
+  /*자식 프로세스가 존재하는지 확인*/
+  if(!buf)
+  {
+    printf("1\n");
+    return -1;
+  }
+  /*자식 프로세스가 이미 종료되었다면 is_exited를 리턴*/
+  else if(child_t->is_exited)
+  {
+    printf("2\n");
+    return child_t->status;
+  }
+  /*자식 프로세스가 종료될 때까지 기다렸다가 리턴*/
+  else
+  {
+    printf("3\n");  
+    curr -> wait_tid = child -> tid;
+
+    enum intr_level old_level;
+    old_level = intr_disable();
+    thread_block();
+    intr_set_level(old_level);
+
+    if (!(child_t->is_exited))
+    {
+      return -1;
+    }
+    return child_t->status;
+  }
 }
 
 /* Free the current process's resources. */
@@ -118,7 +186,31 @@ process_exit (void)
 {
   struct thread *curr = thread_current ();
   uint32_t *pd;
+  struct file_descriptor *file_des;
+  struct list_elem *e;
 
+
+  while(!list_empty(&curr->file_list))
+  {
+    file_des = list_entry(list_pop_back(&curr->file_list),struct file_descriptor,elem);
+    close(file_des -> fd);
+  }
+
+  while(!list_empty(&curr->child_list))
+  {
+    struct child *child_t = list_entry(list_pop_back(&curr->child_list),struct child,elem);
+    free(child_t);
+  }
+
+  struct thread *parent = get_thread(curr->parent_tid);
+  for(e=list_begin(&parent->child_list);e!=list_end(&parent->child_list);e=list_next(e))
+  {
+    struct child* pchild_t = list_entry(e,struct child,elem);
+    if(pchild_t -> pid == curr -> tid)
+    {
+      pchild_t -> is_exited = true;
+    }
+  }
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   pd = curr->pagedir;
@@ -134,8 +226,10 @@ process_exit (void)
       curr->pagedir = NULL;
       pagedir_activate (NULL);
       pagedir_destroy (pd);
+    
     }
-}
+    thread_unblock(parent);
+  }
 
 /* Sets up the CPU for running user code in the current
    thread.
@@ -238,12 +332,16 @@ load (const char *cmd_line, void (**eip) (void), void **esp)
 
   char *file_name;
 
+  printf("load -> cmd_line = %s\n", cmd_line);
+
   char *argv = malloc(128);
   char *address = NULL;
 
-  strlcpy(argv, cmd_line, strlen(cmd_line));
+  strlcpy(argv, cmd_line, 128);
+  printf("load -> argv = %s\n", argv);
+
   file_name = strtok_r(argv, " ", &address);
-  free(argv);
+  printf("load -> file_name = %s\n", file_name);
 
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create ();
@@ -267,7 +365,8 @@ load (const char *cmd_line, void (**eip) (void), void **esp)
       || ehdr.e_version != 1
       || ehdr.e_phentsize != sizeof (struct Elf32_Phdr)
       || ehdr.e_phnum > 1024) 
-    {
+    { printf("file_read (file, &ehdr, sizeof ehdr) = %d, %d\n", file_read (file, &ehdr, sizeof ehdr), sizeof ehdr);
+      printf("ehdr.e_type = %d, 2\n",ehdr.e_type);
       printf ("load: %s: error loading executable\n", file_name);
       goto done; 
     }
@@ -330,13 +429,13 @@ load (const char *cmd_line, void (**eip) (void), void **esp)
           break;
         }
     }
-
+    free(argv);
   /* Set up stack. */
   if (!setup_stack (esp))
     goto done;
-
+  printf("adf\n");
   argv_put_stack(cmd_line,argument_count(cmd_line), esp);
-
+  hex_dump(0xbfffffb4, 0xbfffffb4, sizeof(char)*100, true);
   /* Start address. */
   *eip = (void (*) (void)) ehdr.e_entry;
 
@@ -345,6 +444,7 @@ load (const char *cmd_line, void (**eip) (void), void **esp)
  done:
   /* We arrive here whether the load is successful or not. */
   file_close (file);
+  printf("file closed\n");
   return success;
 }
 
@@ -530,13 +630,15 @@ argv_put_stack(char *parse,int count, void **esp)
   int align;
   int i = 0;
   
-  strlcpy(argv, parse, strlen(parse));
+  strlcpy(argv, parse, strlen(parse)+1);
   
   token = strtok_r(argv, " ", &address);
+  
 
   /*argv를 쪼개서 buff에 집어 넣는다*/
   while(token != NULL)
   {
+    printf("token = %s\n", token);
     buff[i] = token;
     token = strtok_r(NULL, " ", &address);
     i++;
@@ -550,6 +652,8 @@ argv_put_stack(char *parse,int count, void **esp)
     buff[i] = *esp;
   }
   
+
+  buff[count] = 0;
   /*8바이트로 맞추어준다*/
   align = ((int)*esp) & 3;
   *esp = *esp - align;

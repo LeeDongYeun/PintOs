@@ -95,6 +95,10 @@ struct thread
     /*[project2]*/
     int fd;                             /*file discriptor [project2-syscall] */
     struct list file_list;              /*list of open file [project2=syscall] */
+    int parent_tid;
+    int wait_tid;
+    struct list child_list;
+    struct list_elem all_elem;
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
@@ -104,6 +108,14 @@ struct thread
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
   };
+
+  struct child
+{
+  int pid;
+  bool is_exited;
+  int status;
+  struct list_elem elem;
+};
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
@@ -136,5 +148,5 @@ int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
-
+struct thread * get_thread(int tid);
 #endif /* threads/thread.h */

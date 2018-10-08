@@ -34,10 +34,9 @@ void close(int fd);
 
 struct file *get_file(int fd);
 
-struct lock lock_filesys;
 
 static int 
-get_user (const unit8_t *uaddr)
+get_user (const uint8_t *uaddr)
 {
 	int result;
 	asm ("movl $1f, %0; movzbl %1, %0; 1:"
@@ -190,25 +189,28 @@ halt(void){
 }
 
 void
-exit(int status){
+exit(int status)
+{
 	struct thread *curr = thread_current ();
 
 	printf("%s: exit(%d)\n", curr->name, status);
 
-	/*
   	struct thread *parent = get_thread(curr->parent_tid);
   	struct list_elem *e;
   	for(e=list_begin(&parent->child_list);e!=list_end(&parent->child_list);e=list_next(e))
   	{
-    struct child* pchild_t = list_entry(e,struct child, elem);
-    if(pchild_t -> pid == curr->tid)
-    {
-      pchild_t -> status = status;
-      break;
-    }
-	thread_exit();
-	}*/
-	thread_exit();
+    	struct child* pchild_t = list_entry(e,struct child, elem);
+    	if(pchild_t -> pid == curr->tid)
+   		{
+      		pchild_t -> status = status;
+      		break;
+    	}
+		process_exit();
+	}
+	if(parent->wait_tid == curr -> tid)
+  	{
+    	thread_unblock(parent);
+  	}
 }
 
 pid_t
@@ -411,6 +413,4 @@ close(int fd){
 		}
 	}
 }
-
-
 

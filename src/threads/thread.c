@@ -73,6 +73,26 @@ static void schedule (void);
 void schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
 
+static struct list all_thread;
+
+
+struct thread *
+get_thread(int tid)
+{
+  struct thread * result;
+  struct list_elem * e;
+
+  for(e=list_begin(&all_thread);e!=list_end(&all_thread);e=list_next(e))
+  {
+    result = list_entry(e,struct thread,all_elem);
+    if(result->tid == tid)
+    {
+      return result;
+    }
+  }
+  return NULL;
+}
+
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
    general and it is possible in this case only because loader.S
@@ -93,6 +113,7 @@ thread_init (void)
 
   lock_init (&tid_lock);
   list_init (&ready_list);
+  list_init(&all_thread);
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
@@ -445,7 +466,12 @@ init_thread (struct thread *t, const char *name, int priority)
 
   /*project2*/
   list_init(&t->file_list);
-  t->fd = 2; 
+  t->fd = 2;
+  list_init(&t->child_list);
+  t->parent_tid = -1;
+  t->wait_tid = -1;
+  list_push_back(&all_thread,&t->all_elem);
+
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and

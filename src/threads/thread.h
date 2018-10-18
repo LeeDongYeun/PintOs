@@ -4,6 +4,8 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
+#include "synch.h"
+#include "filesys/file.h"
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -96,6 +98,13 @@ struct thread
     int fd;                             /*file discriptor [project2-syscall] */
     struct list file_list;              /*list of open file [project2=syscall] */
     struct list_elem all_elem;
+    struct list child_list;
+    struct list_elem child_elem;
+    int exit_status;
+    struct semaphore sema_wait;
+    struct semaphore sema_destroy;
+    struct file *file;
+
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */

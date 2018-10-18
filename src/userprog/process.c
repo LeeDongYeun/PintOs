@@ -32,31 +32,33 @@ tid_t
 process_execute (const char *cmd_line) 
 {
   char *file_name;
+  char *cmd_line2;
   tid_t tid;
 
-  char *argv = malloc(128);
   char *address = NULL;
-
-  strlcpy(argv, cmd_line, strlen(cmd_line)+1);
 
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
   file_name = palloc_get_page (0);
-  if (file_name == NULL)
+  cmd_line2 = palloc_get_page (0);
+  if (file_name == NULL || cmd_line2 == NULL)
     return TID_ERROR;
-  
-  file_name = strtok_r(argv, " ", &address);
+
+  strlcpy(cmd_line2, cmd_line, strlen(cmd_line)+1);
+  strlcpy(file_name, cmd_line, strlen(cmd_line)+1);
+  file_name = strtok_r(file_name, " ", &address);
 
   /* Create a new thread to execute FILE_NAME. */
   printf("%s %s\n",file_name,cmd_line);
-  tid = thread_create (file_name, PRI_DEFAULT, start_process, cmd_line);
+  tid = thread_create (file_name, PRI_DEFAULT, start_process, cmd_line2);
+  
   if (tid == TID_ERROR)
   {
-    palloc_free_page (file_name); 
-    return -1;
+    palloc_free_page (cmd_line2); 
   }
 
-  free(argv);
+  palloc_free_page(file_name);
+
   printf("process_execute done\n");
 
   return tid;
@@ -67,36 +69,27 @@ process_execute (const char *cmd_line)
 static void
 start_process (void *cmd_line)
 {
-  char *file_name;
+  char *cmd_line2;
   struct intr_frame if_;
   bool success;
 
-  char *argv = malloc(128);
-  char *address = NULL;
-
-  printf("adfad\n");
-
-  strlcpy(argv, cmd_line, strlen(cmd_line));
-  file_name = strtok_r(argv, " ", &address);
+  cmd_line2 = cmd_line;
 
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
-  success = load (cmd_line, &if_.eip, &if_.esp);
+  success = load (cmd_line2, &if_.eip, &if_.esp);
   printf("load successed\n");
   printf("success = %d\n", success);
 
+  palloc_free_page(cmd_line2);
   /* If load failed, quit. */
-  //palloc_free_page (file_name); -> 현재 여기서 걸림
-  free(argv);
-
-  if (!success){
-    palloc_free_page (file_name);
-    printf("palloc free page file name\n");
+  if (!success)
     thread_exit ();
-  } 
+
+  printf("start_process over 1\n");
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -120,21 +113,54 @@ start_process (void *cmd_line)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
-  printf("process_wait start\n");
+  struct thread *child_process;
+  int status;
 
-  while(1){
+  printf("process_wait started\n");
+  printf("child_tid = %d\n", child_tid);
 
+  child_process = get_child_thread(child_tid);
+  if(child_process == NULL){
+    printf("child_process is NULL\n");
+    return -1;
   }
+  printf("sema_down\n");
+  sema_down(&child_process->sema_wait);
+  printf("sema_up\n");
 
-  return -1;
+  status = child_process->exit_status;
+
+  list_remove(&child_process->child_elem);
+  printf("child exit status = %d\n", status);
+
+  sema_up(&child_process->sema_destroy);
+
+  return status;
 }
 
 /* Free the current process's resources. */
 void
 process_exit (void)
 {
+  printf("process_exit started\n");
+
   struct thread *curr = thread_current ();
   uint32_t *pd;
+
+  struct list_elem *e;
+  struct file_descriptor *file_descriptor;
+
+  ASSERT (&curr->file_list != NULL);
+
+  for(e = list_begin(&curr->file_list); e != list_end(&curr->file_list); e = list_next(e)){
+    file_descriptor = list_entry(e, struct file_descriptor, elem);
+    
+    list_remove(&file_descriptor->elem);
+    file_close(file_descriptor->file);
+
+  }
+  printf("process_exit - all file closed\n");
+
   
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
@@ -575,7 +601,6 @@ argv_put_stack(char *parse,int count, void **esp)
     memcpy(*esp, buff[i], arg_len);
     buff[i] = *esp;
   }
-  
 
   buff[count] = 0;
   /*8바이트로 맞추어준다*/
@@ -606,4 +631,6 @@ argv_put_stack(char *parse,int count, void **esp)
 
   free(buff);
   free(argv);
+
+  printf("argv_put_stack - esp = %p\n", *esp);
 }

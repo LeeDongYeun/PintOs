@@ -375,8 +375,10 @@ power_off (void)
   printf ("Powering off...\n");
   serial_flush ();
 
-  for (p = s; *p != '\0'; p++)
+  for (p = s; *p != '\0'; p++){
     outb (0x8900, *p);
+    outw (0xB004, 0x2000);
+  }
   asm volatile ("cli; hlt" : : : "memory");
   printf ("still running...\n");
   for (;;);

@@ -49,7 +49,9 @@ int get_argv(char *ptr)
 	unsigned temp1 = get_user(ptr);
 	unsigned temp2 = get_user(ptr+1);
 	unsigned temp3 = get_user(ptr+2);
-	unsigned temp4 = get_user(ptr+3);;
+	unsigned temp4 = get_user(ptr+3);
+
+	printf("get_argv\n");
 	
 	if(temp1 == -1 || temp2 == -1 || temp3 == -1 || temp4 == -1)
 	{	
@@ -57,7 +59,10 @@ int get_argv(char *ptr)
 		exit(-1);
 	}
 	else
-	{
+	{	
+		//printf("()(s) get_argv = %s", (char*)temp1 + (temp2 << 8) + (temp3 << 16) + (temp4 << 24));
+		//printf("(%)(d) get_argv = %d", (int)temp1 + (temp2 << 8) + (temp3 << 16) + (temp4 << 24));
+
 		return temp1 + (temp2 << 8) + (temp3 << 16) + (temp4 << 24);
 	}
 }
@@ -80,13 +85,18 @@ static void
 syscall_handler (struct intr_frame *f) 
 {
 	int esp_val = get_argv(f->esp);
+
+	//printf("esp_val = %s\n", (char*)esp_val);
 	
+	printf("syscall_handler started\n");
+
 	switch(esp_val){
 	  	case SYS_HALT:
 	  		halt();
 	  		break;
 
 	  	case SYS_EXIT:
+	  		printf("SYS_EXIT\n");
 	  		exit((int)get_argv(esp_val+4));
 	  		break;
 
@@ -193,14 +203,15 @@ void
 exit(int status)
 {
 	struct thread *curr = thread_current ();
-
+	curr->exit_status = status;
 	printf("%s: exit(%d)\n", curr->name, status);
 
-  	process_exit();
+  	thread_exit();
 }
 
 pid_t
 exec(const char *cmd_line){
+	printf("exec function started\n");
 	return process_execute(cmd_line);
 }
 

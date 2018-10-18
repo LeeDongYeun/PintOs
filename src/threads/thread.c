@@ -467,9 +467,6 @@ init_thread (struct thread *t, const char *name, int priority)
   /*project2*/
   list_init(&t->file_list);
   t->fd = 2;
-  list_init(&t->child_list);
-  t->parent_tid = -1;
-  t->wait_tid = -1;
   list_push_back(&all_thread,&t->all_elem);
 
 }

@@ -52,7 +52,8 @@ int get_argv(char *ptr)
 	unsigned temp4 = get_user(ptr+3);;
 	
 	if(temp1 == -1 || temp2 == -1 || temp3 == -1 || temp4 == -1)
-	{
+	{	
+		printf("get_argv exit\n");
 		exit(-1);
 	}
 	else
@@ -195,22 +196,7 @@ exit(int status)
 
 	printf("%s: exit(%d)\n", curr->name, status);
 
-  	struct thread *parent = get_thread(curr->parent_tid);
-  	struct list_elem *e;
-  	for(e=list_begin(&parent->child_list);e!=list_end(&parent->child_list);e=list_next(e))
-  	{
-    	struct child* pchild_t = list_entry(e,struct child, elem);
-    	if(pchild_t -> pid == curr->tid)
-   		{
-      		pchild_t -> status = status;
-      		break;
-    	}
-		process_exit();
-	}
-	if(parent->wait_tid == curr -> tid)
-  	{
-    	thread_unblock(parent);
-  	}
+  	process_exit();
 }
 
 pid_t

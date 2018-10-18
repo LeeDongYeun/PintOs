@@ -56,17 +56,6 @@ process_execute (const char *cmd_line)
     return -1;
   }
 
-  struct thread *child_thread = get_thread(tid);
-  struct thread *curr = thread_current();
-  child_thread->parent_tid = curr -> tid;
-
-  struct child *child_t;
-  child_t -> pid = tid;
-  child_t -> is_exited = false;
-  child_t -> status = -1;
-
-  list_push_back(&curr->child_list,&child_t -> elem);
-
   free(argv);
   printf("process_execute done\n");
 
@@ -97,6 +86,7 @@ start_process (void *cmd_line)
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (cmd_line, &if_.eip, &if_.esp);
   printf("load successed\n");
+  printf("success = %d\n", success);
 
   /* If load failed, quit. */
   //palloc_free_page (file_name); -> 현재 여기서 걸림
@@ -130,54 +120,13 @@ start_process (void *cmd_line)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
-  printf("asdf\n");
-  struct thread *child = get_thread(child_tid);
-  struct list_elem * e;
-  struct thread *curr = thread_current();
-  struct child *child_t;
-  bool buf = false;
+  printf("process_wait start\n");
 
-  /*현재 프로세스가 tid 값이 child_tid인 process를 child로 가졌는지 확인한다*/
-  for(e=list_begin(&curr->child_list);e!=list_end(&curr->child_list);e=list_next(e))
-  {
-    child_t = list_entry(e,struct child,elem);
-    if(child_t->pid == child_tid)
-    {
-      buf = true;
-      break;
-    }
-  }
-  printf("sdfg\n");
+  while(1){
 
-  /*자식 프로세스가 존재하는지 확인*/
-  if(!buf)
-  {
-    printf("1\n");
-    return -1;
   }
-  /*자식 프로세스가 이미 종료되었다면 is_exited를 리턴*/
-  else if(child_t->is_exited)
-  {
-    printf("2\n");
-    return child_t->status;
-  }
-  /*자식 프로세스가 종료될 때까지 기다렸다가 리턴*/
-  else
-  {
-    printf("3\n");  
-    curr -> wait_tid = child -> tid;
 
-    enum intr_level old_level;
-    old_level = intr_disable();
-    thread_block();
-    intr_set_level(old_level);
-
-    if (!(child_t->is_exited))
-    {
-      return -1;
-    }
-    return child_t->status;
-  }
+  return -1;
 }
 
 /* Free the current process's resources. */
@@ -186,31 +135,7 @@ process_exit (void)
 {
   struct thread *curr = thread_current ();
   uint32_t *pd;
-  struct file_descriptor *file_des;
-  struct list_elem *e;
-
-
-  while(!list_empty(&curr->file_list))
-  {
-    file_des = list_entry(list_pop_back(&curr->file_list),struct file_descriptor,elem);
-    close(file_des -> fd);
-  }
-
-  while(!list_empty(&curr->child_list))
-  {
-    struct child *child_t = list_entry(list_pop_back(&curr->child_list),struct child,elem);
-    free(child_t);
-  }
-
-  struct thread *parent = get_thread(curr->parent_tid);
-  for(e=list_begin(&parent->child_list);e!=list_end(&parent->child_list);e=list_next(e))
-  {
-    struct child* pchild_t = list_entry(e,struct child,elem);
-    if(pchild_t -> pid == curr -> tid)
-    {
-      pchild_t -> is_exited = true;
-    }
-  }
+  
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   pd = curr->pagedir;
@@ -228,8 +153,7 @@ process_exit (void)
       pagedir_destroy (pd);
     
     }
-    thread_unblock(parent);
-  }
+}
 
 /* Sets up the CPU for running user code in the current
    thread.

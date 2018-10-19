@@ -102,8 +102,10 @@ struct thread
     struct list_elem child_elem;
     int exit_status;
     struct semaphore sema_wait;
+    struct semaphore sema_load;
     struct semaphore sema_destroy;
     struct file *file;
+    bool load_status;
 
 
 #ifdef USERPROG

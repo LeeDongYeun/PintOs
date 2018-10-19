@@ -34,7 +34,6 @@ void close(int fd);
 
 struct file *get_file(int fd);
 
-
 static int 
 get_user (const uint8_t *uaddr)
 {
@@ -74,8 +73,9 @@ open함수에서 file을 오픈할 때마다 1씩 증가한다
 void
 syscall_init (void) 
 {
-	intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 	lock_init(&lock_filesys);
+	intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
+	
 }
 
 static void
@@ -128,6 +128,7 @@ syscall_handler (struct intr_frame *f)
 	  		break;
 
 	  	case SYS_WRITE:
+	  		//printf("SYS_WRITE\n");
 	  		f -> eax = write((int)get_argv((int *)f->esp+1), (void *)get_argv((int *)f->esp+2), (unsigned)get_argv((int *)f->esp+3));
 	  		break;
 
@@ -203,9 +204,21 @@ exit(int status)
 
 pid_t
 exec(const char *cmd_line){
-	//printf("exec function started\n");
-	//check_pointer(cmd_line);
-	return process_execute(cmd_line);
+	//printf("syscall_handler - exec\n");
+	int tid;
+	struct thread *child_process;
+
+	tid = process_execute(cmd_line);
+	child_process = get_child_thread(tid);
+
+	if(child_process == NULL)
+		return -1;
+
+	sema_down(&child_process->sema_load);
+	if(!&child_process->load_status)
+		return -1;
+
+	return tid;
 }
 
 
@@ -247,17 +260,21 @@ file_descriptor라는 구조체를 저장한다. 그 후 fd를 증가시켜 준�
 */
 int
 open(const char *file){
-	bool result;
+	int result;
 
+	struct thread *curr = thread_current();
 	//check_pointer(file);
 	lock_acquire(&lock_filesys);
 	struct file *f = filesys_open(file);
+	lock_release(&lock_filesys);
+	
 	if(!file){
 		result = -1;
 	}
+
 	else{
-		struct thread *curr = thread_current();
-		struct file_descriptor *file_descriptor;
+		
+		struct file_descriptor *file_descriptor = malloc(sizeof(struct file_descriptor));
 		
 		file_descriptor->file = f;
 		file_descriptor->fd = curr->fd;
@@ -265,7 +282,7 @@ open(const char *file){
 		result = curr->fd;
 		curr->fd++;
 	}
-	lock_release(&lock_filesys);
+	
 
 	return result;
 }

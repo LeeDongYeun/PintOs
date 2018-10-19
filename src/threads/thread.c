@@ -301,6 +301,7 @@ struct thread *
 thread_current (void) 
 {
   struct thread *t = running_thread ();
+  //printf("thread_current pid %d\n", t->tid);
   
   /* Make sure T is really a thread.
      If either of these assertions fire, then your thread may
@@ -510,8 +511,10 @@ init_thread (struct thread *t, const char *name, int priority)
   list_init(&t->child_list);
   t->exit_status = NULL;
   sema_init(&t->sema_wait, 0);
+  sema_init(&t->sema_load, 0);
   sema_init(&t->sema_destroy, 0);
   t->file = NULL;
+  t->load_status = false;
 
 }
 

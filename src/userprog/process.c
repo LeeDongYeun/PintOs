@@ -83,6 +83,11 @@ start_process (void *cmd_line)
   success = load (cmd_line2, &if_.eip, &if_.esp);
   //printf("load successed\n");
   //printf("success = %d\n", success);
+  thread_current()-> load_status = success;
+
+  sema_up(&thread_current()->sema_load);
+
+  //printf("start process = sema up\n");
 
   palloc_free_page(cmd_line2);
   /* If load failed, quit. */
@@ -135,6 +140,7 @@ process_wait (tid_t child_tid UNUSED)
   //printf("child exit status = %d\n", status);
 
   sema_up(&child_process->sema_destroy);
+  //printf("process_wiat sema_destroy_up\n");
 
   return status;
 }
@@ -160,9 +166,9 @@ process_exit (void)
     file_close(file_descriptor->file);
 
   }
+  //file_close(curr->file);
   //printf("process_exit - all file closed\n");
 
-  file_close(curr->file);
   
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
@@ -309,6 +315,9 @@ load (const char *cmd_line, void (**eip) (void), void **esp)
       goto done; 
     }
 
+  //t->file = file;
+  //file_deny_write(file);
+
   /* Read and verify executable header. */
   if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
       || memcmp (ehdr.e_ident, "\177ELF\1\1\1", 7)
@@ -392,9 +401,6 @@ load (const char *cmd_line, void (**eip) (void), void **esp)
   *eip = (void (*) (void)) ehdr.e_entry;
 
   success = true;
-
-  file_deny_write(file);
-  t->file = file;
 
  done:
   /* We arrive here whether the load is successful or not. */

@@ -326,7 +326,7 @@ thread_tid (void)
 void
 thread_exit (void) 
 {
-  //struct list_elem *child;
+
   ASSERT (!intr_context ());
 
 #ifdef USERPROG
@@ -334,14 +334,7 @@ thread_exit (void)
   //printf("thread_exit - process_exit\n");
 #endif
   /*project2 added*/
-  /*
-  for (child = list_begin (&thread_current ()->child_list);
-     child != list_end (&thread_current ()->child_list); ){
-      struct thread *t = list_entry (child, struct thread, child_elem);
-      child = list_remove (child);
-      sema_up (&t->sema_destroy);
-  }*/
-  
+
   sema_up(&thread_current()->sema_wait);
   //printf("thread_exit - sema_up\n");
   sema_down(&thread_current()->sema_destroy);

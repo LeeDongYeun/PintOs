@@ -166,7 +166,7 @@ process_exit (void)
     
     list_remove(&file_descriptor->elem);
     file_close(file_descriptor->file);
-
+    //free(file_descriptor);
   }
   file_close(curr->file);
   //printf("process_exit - file closed\n");
@@ -390,7 +390,7 @@ load (const char *cmd_line, void (**eip) (void), void **esp)
           break;
         }
     }
-    free(argv);
+    
 
   t->file = file;
   file_deny_write(file);
@@ -407,6 +407,7 @@ load (const char *cmd_line, void (**eip) (void), void **esp)
   success = true;
 
  done:
+  free(argv);
   if(success)
   {
     thread_current()->file = file;

@@ -16,7 +16,6 @@
 typedef int pid_t;
 
 static void syscall_handler (struct intr_frame *);
-void check_pointer(void *ptr);
 
 void halt(void);
 void exit(int status);
@@ -147,22 +146,6 @@ syscall_handler (struct intr_frame *f)
 	
 }
 
-void
-check_pointer(void *ptr){
-	/*
-	if(ptr >= PHYS_BASE){
-		//printf("PHYS_BASE\n");
-		exit(-1);
-	}
-	if(!is_user_vaddr(ptr))
-		exit(-1);
-	*/
-  // 유저 영역 주소인지 확인한 다음, 올바른 가상 주소인지 확인합니다.
-  if (!(is_user_vaddr (ptr) && ptr >= (void *)0x08048000UL))
-    exit (-1);
-
-
-}
 
 /*
 현재 thread에 있는 file_list에서 fd가 같은 값을 찾은 후 file에 대한
@@ -431,6 +414,7 @@ close(int fd){
 			lock_acquire(&lock_filesys);
 			file_close(file_descriptor->file);
 			lock_release(&lock_filesys);
+			//free(file_descriptor);
 			break;
 		}
 	}

@@ -169,7 +169,7 @@ process_exit (void)
 
   }
   file_close(curr->file);
-  //printf("process_exit - all file closed\n");
+  //printf("process_exit - file closed\n");
 
   
   /* Destroy the current process's page directory and switch back
@@ -326,6 +326,8 @@ load (const char *cmd_line, void (**eip) (void), void **esp)
       || ehdr.e_phentsize != sizeof (struct Elf32_Phdr)
       || ehdr.e_phnum > 1024) 
     { 
+      //printf("file_read (file, &ehdr, sizeof ehdr) = %d, %d\n", file_read (file, &ehdr, sizeof ehdr), sizeof ehdr);
+      //printf("ehdr.e_type = %d, 2\n",ehdr.e_type);
       printf ("load: %s: error loading executable\n", file_name);
       goto done; 
     }
@@ -405,9 +407,14 @@ load (const char *cmd_line, void (**eip) (void), void **esp)
   success = true;
 
  done:
-  /* We arrive here whether the load is successful or not. */
-  //file_close (file);
-  //printf("file closed\n");
+  if(success)
+  {
+    thread_current()->file = file;
+    file_deny_write(file);
+    //printf("file_deny_write\n");
+  }
+  else
+    file_close (file);
   return success;
 }
 

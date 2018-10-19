@@ -214,13 +214,12 @@ exec(const char *cmd_line){
 	tid = process_execute(cmd_line);
 	child_process = get_child_thread(tid);
 
-	if(child_process == NULL)
-		return -1;
-
-	sema_down(&child_process->sema_load);
-	if(!child_process->load_status)
-		return -1;
-
+	if(child_process != NULL){
+		sema_down(&child_process->sema_load);
+		if(!child_process->load_status)
+			return -1;
+	}
+	
 	return tid;
 }
 
@@ -372,6 +371,7 @@ write(int fd, const void *buffer, unsigned size){
 			result = file_write(file, buffer, size);
 			lock_release(&lock_filesys);
 		}
+		//printf("syscall_handler - SYS_WRITE -result = %d\n", result);
 		
 	}
 
@@ -385,9 +385,9 @@ seek(int fd, unsigned position){
 	struct file * file = get_file(fd);
 
 	if(!file){
-		file_seek(file, position);
+		return -1;
 	}
-
+	file_seek(file, position);
 	lock_release(&lock_filesys);
 }
 

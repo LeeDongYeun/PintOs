@@ -130,6 +130,8 @@ process_wait (tid_t child_tid UNUSED)
     //printf("child_process is NULL\n");
     return -1;
   }
+  if(child_process == thread_current())
+    return -1;
   //printf("sema_down\n");
   sema_down(&child_process->sema_wait);
   //printf("sema_up\n");
@@ -166,7 +168,7 @@ process_exit (void)
     file_close(file_descriptor->file);
 
   }
-  //file_close(curr->file);
+  file_close(curr->file);
   //printf("process_exit - all file closed\n");
 
   
@@ -315,9 +317,6 @@ load (const char *cmd_line, void (**eip) (void), void **esp)
       goto done; 
     }
 
-  //t->file = file;
-  //file_deny_write(file);
-
   /* Read and verify executable header. */
   if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
       || memcmp (ehdr.e_ident, "\177ELF\1\1\1", 7)
@@ -326,8 +325,7 @@ load (const char *cmd_line, void (**eip) (void), void **esp)
       || ehdr.e_version != 1
       || ehdr.e_phentsize != sizeof (struct Elf32_Phdr)
       || ehdr.e_phnum > 1024) 
-    { printf("file_read (file, &ehdr, sizeof ehdr) = %d, %d\n", file_read (file, &ehdr, sizeof ehdr), sizeof ehdr);
-      printf("ehdr.e_type = %d, 2\n",ehdr.e_type);
+    { 
       printf ("load: %s: error loading executable\n", file_name);
       goto done; 
     }
@@ -391,6 +389,10 @@ load (const char *cmd_line, void (**eip) (void), void **esp)
         }
     }
     free(argv);
+
+  t->file = file;
+  file_deny_write(file);
+
   /* Set up stack. */
   if (!setup_stack (esp))
     goto done;
@@ -404,7 +406,7 @@ load (const char *cmd_line, void (**eip) (void), void **esp)
 
  done:
   /* We arrive here whether the load is successful or not. */
-  file_close (file);
+  //file_close (file);
   //printf("file closed\n");
   return success;
 }

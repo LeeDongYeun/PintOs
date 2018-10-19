@@ -325,7 +325,7 @@ read(int fd, void *buffer, unsigned size){
 	int result;
 
 	//check_pointer(buffer);
-	if(fd == 0){
+	if(fd == STDIN_FILENO){
 		unsigned i = 0;
 
 		for(;i<size;i++)
@@ -356,21 +356,23 @@ write(int fd, const void *buffer, unsigned size){
 	int result;
 
 	//check_pointer(buffer);
-	if(fd == 1){
+	if(fd == STDOUT_FILENO){
 		putbuf(buffer, size);
 		result = size;
 	}
 	else{
-		lock_acquire(&lock_filesys);
+		
 		struct file *file = get_file(fd);
 
 		if(!file){
 			result = 0;
 		}
 		else{
+			lock_acquire(&lock_filesys);
 			result = file_write(file, buffer, size);
+			lock_release(&lock_filesys);
 		}
-		lock_release(&lock_filesys);
+		
 	}
 
 	return result;

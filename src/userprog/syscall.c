@@ -208,6 +208,9 @@ exec(const char *cmd_line){
 	int tid;
 	struct thread *child_process;
 
+	if(cmd_line == NULL)
+		return -1;
+
 	tid = process_execute(cmd_line);
 	child_process = get_child_thread(tid);
 
@@ -215,7 +218,7 @@ exec(const char *cmd_line){
 		return -1;
 
 	sema_down(&child_process->sema_load);
-	if(!&child_process->load_status)
+	if(!child_process->load_status)
 		return -1;
 
 	return tid;
@@ -260,6 +263,9 @@ file_descriptor라는 구조체를 저장한다. 그 후 fd를 증가시켜 준�
 */
 int
 open(const char *file){
+
+	if(file ==NULL)
+		return -1;
 	int result;
 
 	struct thread *curr = thread_current();
@@ -268,7 +274,7 @@ open(const char *file){
 	struct file *f = filesys_open(file);
 	lock_release(&lock_filesys);
 	
-	if(!file){
+	if(!f){
 		result = -1;
 	}
 

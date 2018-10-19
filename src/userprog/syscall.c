@@ -16,7 +16,7 @@
 typedef int pid_t;
 
 static void syscall_handler (struct intr_frame *);
-void *check_pointer(void *ptr);
+void check_pointer(void *ptr);
 
 void halt(void);
 void exit(int status);
@@ -38,6 +38,8 @@ struct file *get_file(int fd);
 static int 
 get_user (const uint8_t *uaddr)
 {
+	if(uaddr >= PHYS_BASE)
+  		return -1;
 	int result;
 	asm ("movl $1f, %0; movzbl %1, %0; 1:"
 		: "=&a" (result) : "m" (*uaddr));
@@ -51,18 +53,13 @@ int get_argv(char *ptr)
 	unsigned temp3 = get_user(ptr+2);
 	unsigned temp4 = get_user(ptr+3);
 
-	printf("get_argv\n");
 	
 	if(temp1 == -1 || temp2 == -1 || temp3 == -1 || temp4 == -1)
 	{	
-		printf("get_argv exit\n");
 		exit(-1);
 	}
 	else
 	{	
-		//printf("()(s) get_argv = %s", (char*)temp1 + (temp2 << 8) + (temp3 << 16) + (temp4 << 24));
-		//printf("(%)(d) get_argv = %d", (int)temp1 + (temp2 << 8) + (temp3 << 16) + (temp4 << 24));
-
 		return temp1 + (temp2 << 8) + (temp3 << 16) + (temp4 << 24);
 	}
 }
@@ -83,12 +80,14 @@ syscall_init (void)
 
 static void
 syscall_handler (struct intr_frame *f) 
-{
-	int esp_val = get_argv(f->esp);
+{	
+	int esp_val = (get_argv(f->esp));
+	//check_pointer(esp_val);
 
-	//printf("esp_val = %s\n", (char*)esp_val);
+	//printf("handler esp = %p", f->esp);
+	//printf("esp_val = %d\n", esp_val);
 	
-	printf("syscall_handler started\n");
+	//printf("syscall_handler started\n");
 
 	switch(esp_val){
 	  	case SYS_HALT:
@@ -96,79 +95,72 @@ syscall_handler (struct intr_frame *f)
 	  		break;
 
 	  	case SYS_EXIT:
-	  		printf("SYS_EXIT\n");
-	  		exit((int)get_argv(esp_val+4));
+	  		//printf("SYS_EXIT\n");
+	  		exit((int)get_argv((int *)f->esp+1));
 	  		break;
 
 	  	case SYS_EXEC:
-	  		f -> eax = (uint32_t) exec((char*)get_argv(esp_val+4));
+	  		f -> eax = (uint32_t) exec((char*)get_argv((int *)f->esp+1));
 	  		break;
 
 	  	case SYS_WAIT:
-	  		f -> eax = (uint32_t) wait((int)get_argv(esp_val+4));
+	  		f -> eax = (uint32_t) wait((int)get_argv((int *)f->esp+1));
 	  		break;
 
 	  	case SYS_CREATE:
-	  		f -> eax = create((char *)get_argv(esp_val+4), (unsigned)get_argv(esp_val+8));
+	  		f -> eax = create((char *)get_argv((int *)f->esp+1), (unsigned)get_argv((int *)f->esp+2));
 	  		break;
 
 	  	case SYS_REMOVE:
-	  		f -> eax = remove((char *)get_argv(esp_val+4));
+	  		f -> eax = remove((char *)get_argv((int *)f->esp+1));
 	  		break;
 
 	  	case SYS_OPEN:
-	  		f -> eax = open((char *)get_argv(esp_val+4));
+	  		f -> eax = open((char *)get_argv((int *)f->esp+1));
 	  		break;
 
 	  	case SYS_FILESIZE:
-	  		f -> eax = filesize((int)get_argv(esp_val+4));
+	  		f -> eax = filesize((int)get_argv((int *)f->esp+1));
 	  		break;
 
 	  	case SYS_READ:
-	  		f -> eax = read((int)get_argv(esp_val+4), (void *)get_argv(esp_val+8), (unsigned)get_argv(esp_val+12));
+	  		f -> eax = read((int)get_argv((int *)f->esp+1), (void *)get_argv((int *)f->esp+2), (unsigned)get_argv((int *)f->esp+3));
 	  		break;
 
 	  	case SYS_WRITE:
-	  		f -> eax = write((int)get_argv(esp_val+4), (void *)get_argv(esp_val+8), (unsigned)get_argv(esp_val+12));
+	  		f -> eax = write((int)get_argv((int *)f->esp+1), (void *)get_argv((int *)f->esp+2), (unsigned)get_argv((int *)f->esp+3));
 	  		break;
 
 	  	case SYS_SEEK:
-	  		seek((int)get_argv(esp_val+4), (unsigned)get_argv(esp_val+8));
+	  		seek((int)get_argv((int *)f->esp+1), (unsigned)get_argv((int *)f->esp+2));
 	  		break;
 
 	  	case SYS_TELL:
-	  		f -> eax = tell((int)get_argv(esp_val+4));
+	  		f -> eax = tell((int)get_argv((int *)f->esp+1));
 	  		break;
 
 	  	case SYS_CLOSE:
-	  		close((int)get_argv(esp_val+4));
+	  		close((int)get_argv((int *)f->esp+1));
 	  		break;
-
-	  	default :
-	  		exit(-1);
 	}
 	
 }
 
-void*
+void
 check_pointer(void *ptr){
-	void *result = 0;
+	/*
 	if(ptr >= PHYS_BASE){
+		//printf("PHYS_BASE\n");
 		exit(-1);
 	}
+	if(!is_user_vaddr(ptr))
+		exit(-1);
+	*/
+  // 유저 영역 주소인지 확인한 다음, 올바른 가상 주소인지 확인합니다.
+  if (!(is_user_vaddr (ptr) && ptr >= (void *)0x08048000UL))
+    exit (-1);
 
-	else{
 
-		void *pointer = pagedir_get_page(thread_current()->pagedir, ptr);
-		if(!pointer){
-			exit(-1);
-		}
-		else{
-			result = ptr;
-		}
-	}
-
-	return result;
 }
 
 /*
@@ -211,7 +203,8 @@ exit(int status)
 
 pid_t
 exec(const char *cmd_line){
-	printf("exec function started\n");
+	//printf("exec function started\n");
+	//check_pointer(cmd_line);
 	return process_execute(cmd_line);
 }
 
@@ -226,6 +219,9 @@ bool
 create(const char *file, unsigned initial_size){
 	bool result;
 
+	if(file==NULL)
+		exit(-1);
+
 	lock_acquire(&lock_filesys);
 	result = filesys_create(file, initial_size);
 	lock_release(&lock_filesys);
@@ -236,7 +232,8 @@ create(const char *file, unsigned initial_size){
 bool
 remove(const char *file){
 	bool result;
-	
+
+	//check_pointer(file);
 	lock_acquire(&lock_filesys);
 	result = filesys_remove(file);
 	lock_release(&lock_filesys);
@@ -252,6 +249,7 @@ int
 open(const char *file){
 	bool result;
 
+	//check_pointer(file);
 	lock_acquire(&lock_filesys);
 	struct file *f = filesys_open(file);
 	if(!file){
@@ -303,6 +301,7 @@ int
 read(int fd, void *buffer, unsigned size){
 	int result;
 
+	//check_pointer(buffer);
 	if(fd == 0){
 		unsigned i = 0;
 
@@ -333,6 +332,7 @@ int
 write(int fd, const void *buffer, unsigned size){
 	int result;
 
+	//check_pointer(buffer);
 	if(fd == 1){
 		putbuf(buffer, size);
 		result = size;

@@ -49,7 +49,7 @@ process_execute (const char *cmd_line)
   file_name = strtok_r(file_name, " ", &address);
 
   /* Create a new thread to execute FILE_NAME. */
-  printf("%s %s\n",file_name,cmd_line);
+  //printf("%s %s\n",file_name,cmd_line);
   tid = thread_create (file_name, PRI_DEFAULT, start_process, cmd_line2);
   
   if (tid == TID_ERROR)
@@ -59,7 +59,7 @@ process_execute (const char *cmd_line)
 
   palloc_free_page(file_name);
 
-  printf("process_execute done\n");
+  //printf("process_execute done\n");
 
   return tid;
 }
@@ -81,15 +81,16 @@ start_process (void *cmd_line)
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (cmd_line2, &if_.eip, &if_.esp);
-  printf("load successed\n");
-  printf("success = %d\n", success);
+  //printf("load successed\n");
+  //printf("success = %d\n", success);
 
   palloc_free_page(cmd_line2);
   /* If load failed, quit. */
   if (!success)
     thread_exit ();
 
-  printf("start_process over 1\n");
+  //printf("start_process over 1\n");
+  //printf("argv_put_stack - esp = %p\n", *(&if_.esp));
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -116,22 +117,22 @@ process_wait (tid_t child_tid UNUSED)
   struct thread *child_process;
   int status;
 
-  printf("process_wait started\n");
-  printf("child_tid = %d\n", child_tid);
+  //printf("process_wait started\n");
+  //printf("child_tid = %d\n", child_tid);
 
   child_process = get_child_thread(child_tid);
   if(child_process == NULL){
-    printf("child_process is NULL\n");
+    //printf("child_process is NULL\n");
     return -1;
   }
-  printf("sema_down\n");
+  //printf("sema_down\n");
   sema_down(&child_process->sema_wait);
-  printf("sema_up\n");
+  //printf("sema_up\n");
 
   status = child_process->exit_status;
 
   list_remove(&child_process->child_elem);
-  printf("child exit status = %d\n", status);
+  //printf("child exit status = %d\n", status);
 
   sema_up(&child_process->sema_destroy);
 
@@ -142,7 +143,7 @@ process_wait (tid_t child_tid UNUSED)
 void
 process_exit (void)
 {
-  printf("process_exit started\n");
+  //printf("process_exit started\n");
 
   struct thread *curr = thread_current ();
   uint32_t *pd;
@@ -159,8 +160,9 @@ process_exit (void)
     file_close(file_descriptor->file);
 
   }
-  printf("process_exit - all file closed\n");
+  //printf("process_exit - all file closed\n");
 
+  file_close(curr->file);
   
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
@@ -282,16 +284,16 @@ load (const char *cmd_line, void (**eip) (void), void **esp)
 
   char *file_name;
 
-  printf("load -> cmd_line = %s\n", cmd_line);
+  //printf("load -> cmd_line = %s\n", cmd_line);
 
   char *argv = malloc(128);
   char *address = NULL;
 
   strlcpy(argv, cmd_line, 128);
-  printf("load -> argv = %s\n", argv);
+  //printf("load -> argv = %s\n", argv);
 
   file_name = strtok_r(argv, " ", &address);
-  printf("load -> file_name = %s\n", file_name);
+  //printf("load -> file_name = %s\n", file_name);
 
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create ();
@@ -383,18 +385,21 @@ load (const char *cmd_line, void (**eip) (void), void **esp)
   /* Set up stack. */
   if (!setup_stack (esp))
     goto done;
-  printf("adf\n");
+
   argv_put_stack(cmd_line,argument_count(cmd_line), esp);
-  hex_dump(0xbfffffb4, 0xbfffffb4, sizeof(char)*100, true);
+  //hex_dump(0xbfffffb4, 0xbfffffb4, sizeof(char)*100, true);
   /* Start address. */
   *eip = (void (*) (void)) ehdr.e_entry;
 
   success = true;
 
+  file_deny_write(file);
+  t->file = file;
+
  done:
   /* We arrive here whether the load is successful or not. */
   file_close (file);
-  printf("file closed\n");
+  //printf("file closed\n");
   return success;
 }
 
@@ -554,7 +559,7 @@ argument_count(char *parse)
   char *address = NULL;
   int i = 0;
   
-  strlcpy(argv, parse, strlen(parse));
+  strlcpy(argv, parse, strlen(parse)+1);
   
   token = strtok_r(argv, " ", &address);
   
@@ -580,6 +585,7 @@ argv_put_stack(char *parse,int count, void **esp)
   int align;
   int i = 0;
   
+  //printf("count = %d", count);
   strlcpy(argv, parse, strlen(parse)+1);
   
   token = strtok_r(argv, " ", &address);
@@ -588,11 +594,12 @@ argv_put_stack(char *parse,int count, void **esp)
   /*argv를 쪼개서 buff에 집어 넣는다*/
   while(token != NULL)
   {
-    printf("token = %s\n", token);
+    //printf("token = %s\n", token);
     buff[i] = token;
     token = strtok_r(NULL, " ", &address);
     i++;
   }
+  //printf("argv_put_stack - esp = %p\n", *esp);
    
   /*buff에서 끝에서부터 esp에 넣어준다*/ 
   for(i = count-1; i>=0;i--){
@@ -600,19 +607,21 @@ argv_put_stack(char *parse,int count, void **esp)
     *esp = *esp - arg_len;
     memcpy(*esp, buff[i], arg_len);
     buff[i] = *esp;
+    //printf("argv_put_stack - esp = %p\n", *esp);
   }
 
   buff[count] = 0;
   /*8바이트로 맞추어준다*/
   align = ((int)*esp) & 3;
   *esp = *esp - align;
-
+  //printf("argv_put_stack - esp = %p\n", *esp);
   /*스택에 argv들의 주소값을 집어 넣는다*/
   
   for(i=count;i>=0;i--)
   {
     *esp = *esp - 4;
     memcpy(*esp, &buff[i], 4);
+    //printf("argv_put_stack - esp = %p\n", *esp);
   }
   
   /*스택에 argv의 주소값을 가지고 있는 주소값을 넣는다*/
@@ -620,11 +629,12 @@ argv_put_stack(char *parse,int count, void **esp)
   argv_ptr = *esp;
   *esp = *esp - 4;
   memcpy(*esp,&argv_ptr,4);
+  //printf("argv_put_stack - esp = %p\n", *esp);
 
   /*스택에 argv의 개수를 넣는다*/
   *esp = *esp - 4;
   memcpy(*esp,&count,4);
-  
+  //printf("argv_put_stack - esp = %p\n", *esp);
   /*return address를 넣는다*/
   *esp = *esp - 4;
   memset(*esp,0,4);
@@ -632,5 +642,5 @@ argv_put_stack(char *parse,int count, void **esp)
   free(buff);
   free(argv);
 
-  printf("argv_put_stack - esp = %p\n", *esp);
+  //printf("argv_put_stack - esp = %p\n", *esp);
 }

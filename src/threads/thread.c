@@ -330,7 +330,7 @@ thread_exit (void)
 
 #ifdef USERPROG
   process_exit ();
-  printf("thread_exit - process_exit\n");
+  //printf("thread_exit - process_exit\n");
 #endif
   /*project2 added*/
   /*
@@ -342,7 +342,7 @@ thread_exit (void)
   }*/
   
   sema_up(&thread_current()->sema_wait);
-  printf("thread_exit - sema_up\n");
+  //printf("thread_exit - sema_up\n");
   sema_down(&thread_current()->sema_destroy);
 
   list_remove(&thread_current()->all_elem);

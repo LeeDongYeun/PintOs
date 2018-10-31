@@ -97,15 +97,15 @@ struct thread
     /*[project2]*/
     int fd;                             /*file discriptor [project2-syscall] */
     struct list file_list;              /*list of open file [project2=syscall] */
-    struct list_elem all_elem;
-    struct list child_list;
-    struct list_elem child_elem;
-    int exit_status;
-    struct semaphore sema_wait;
-    struct semaphore sema_load;
-    struct semaphore sema_destroy;
-    struct file *file;
-    bool load_status;
+    struct list_elem all_elem;          /*store all thread*/
+    struct list child_list;             /*store child thread(process)*/
+    struct list_elem child_elem;        /*list_elem for child_list*/
+    int exit_status;                    /*exit_status that child gives to parent process*/
+    struct semaphore sema_wait;         /*semaphore for wait child process*/
+    struct semaphore sema_load;         /*semaphore for waiting loading of child*/
+    struct semaphore sema_destroy;      /*semaphore for waiting child destroy*/
+    struct file *file;                  /*to control the other write process while process using file*/
+    bool load_status;                   /*to control load*/
 
 
 #ifdef USERPROG

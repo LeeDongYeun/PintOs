@@ -15,6 +15,7 @@ frame_alloc(){
 	struct frame *f = malloc(sizeof(struct frame_table_elem));
 
 	f->addr = page;
+	f->accessable = true;
 
 	return f;
 }
@@ -46,4 +47,16 @@ frame_find(void *addr){
 	}
 
 	return NULL;
+}
+
+struct frame *
+frame_replacement_select(){
+	ASSERT(!list_empty(&frame_table));
+
+	struct list_elem *e = list_begin(&frame_table);
+	struct frame *f = list_entry(e, struct frame, elem);
+
+	while(true){
+		
+	}
 }

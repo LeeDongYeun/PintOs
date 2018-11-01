@@ -1,3 +1,6 @@
+#ifndef VM_FRAME_H
+#define VM_FRAME_H
+
 #include <list.h>
 
 struct frame{
@@ -7,3 +10,5 @@ struct frame{
 };
 
 struct list frame_table;
+
+#endif 

@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include "vm/frame.h"
 #include "threads/palloc.h"
 #include "threads/malloc.h"
@@ -18,6 +19,11 @@ frame_alloc(){
 	f->accessable = true;
 
 	return f;
+}
+
+void
+frame_set_accessable(struct frame *frame, bool boolean){
+	frame->accessable = boolean;
 }
 
 void
@@ -54,9 +60,12 @@ frame_replacement_select(){
 	ASSERT(!list_empty(&frame_table));
 
 	struct list_elem *e = list_begin(&frame_table);
-	struct frame *f = list_entry(e, struct frame, elem);
+	struct frame *f;
 
 	while(true){
-		
+		f = list_entry(e, struct frame, elem);
+		if(f->accessable = true)
+			return f;
+		e = list_next(e);
 	}
 }

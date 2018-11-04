@@ -1,9 +1,10 @@
+#include "vm/page.h"
 #include <stdio.h>
-#include "page.h"
 #include "userprog/pagedir.h"
 #include "threads/thread.h"
 #include "threads/malloc.h"
 #include "threads/vaddr.h"
+
 
 static unsigned
 page_hash_func(const struct hash_elem *e, void *aux UNUSED){

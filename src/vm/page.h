@@ -8,6 +8,6 @@ struct page_table_entry{
 	void *vaddr;
 	struct frame *frame;
 	struct hash_elem elem;
-}
+};
 
 #endif

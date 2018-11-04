@@ -13,7 +13,7 @@ struct frame *
 frame_alloc(){
 
 	void *page = palloc_get_page(PAL_USER);
-	struct frame *f = malloc(sizeof(struct frame_table_elem));
+	struct frame *f = malloc(sizeof(struct frame));
 
 	f->addr = page;
 	f->accessable = true;

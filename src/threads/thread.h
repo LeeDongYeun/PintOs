@@ -4,6 +4,7 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
+#include <hash.h>
 #include "synch.h"
 #include "filesys/file.h"
 
@@ -106,6 +107,9 @@ struct thread
     struct semaphore sema_destroy;      /*semaphore for waiting child destroy*/
     struct file *file;                  /*to control the other write process while process using file*/
     bool load_status;                   /*to control load*/
+
+    /*[project3]*/
+    struct hash page_table;
 
 
 #ifdef USERPROG

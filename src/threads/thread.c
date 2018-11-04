@@ -11,6 +11,7 @@
 #include "threads/switch.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
+#include "vm/page.h"
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
@@ -508,6 +509,8 @@ init_thread (struct thread *t, const char *name, int priority)
   sema_init(&t->sema_destroy, 0);
   t->file = NULL;
   t->load_status = false;
+
+  page_table_init(&t->page_table);
 
 }
 

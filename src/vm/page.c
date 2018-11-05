@@ -50,6 +50,10 @@ page_table_destroy(struct hash *pt){
 struct page_table_entry *
 page_table_entry_alloc(void *uaddr, struct frame *frame){
 	struct page_table_entry *pte = malloc(sizeof(struct page_table_entry));
+	if(pte == NULL){
+		printf("page_table_entry_alloc failed\n");
+		return false;
+	}
 	pte->vaddr = uaddr;
 	pte->frame = frame;
 

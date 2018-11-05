@@ -110,6 +110,7 @@ struct thread
 
     /*[project3]*/
     struct hash page_table;
+    void *esp;
 
 
 #ifdef USERPROG

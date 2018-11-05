@@ -27,6 +27,7 @@ static bool load (const char *cmdline, void (**eip) (void), void **esp);
 bool install_page (void *upage, void *kpage, bool writable);
 int argument_count(char *parse);
 void argv_put_stack(char *parse,int count, void **esp);
+void stack_growth(void *addr);
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
@@ -693,3 +694,35 @@ argv_put_stack(char *parse,int count, void **esp)
 
   //printf("argv_put_stack - esp = %p\n", *esp);
 }
+
+void
+stack_growth(void *addr){
+  struct frame *frame;
+  struct page_table_entry *pte;
+  void *upage = pg_round_down(addr);
+  bool success = false;
+
+  //printf("stack_growth start\n");
+
+  /*프레임을 생성한 후 프레임 리스트에 추가한다*/
+  frame = frame_alloc();
+  if(frame != NULL){
+
+    frame_add(frame);
+    frame_set_accessable(frame, true);
+
+    /*page table entry를 생성한 후 페이지 테이블에 넣어준다*/
+    pte = page_table_entry_alloc(upage, frame);
+    page_table_add(pte);
+
+    success = install_page(upage, frame->addr, true);
+      
+    if(!success)
+      /*install_page 함수가 success가 안되면 페이지 테이블에서 제거하고 
+      프레임 테이블에서도 제거해준다*/
+      page_table_delete(pte);
+  }
+  return success;
+
+}
+

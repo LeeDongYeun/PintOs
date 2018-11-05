@@ -13,6 +13,8 @@
 #include "vm/frame.h"
 #endif
 
+#define MAX_STACK_SIZE (1<<23)
+
 /* Number of page faults processed. */
 static long long page_fault_cnt;
 
@@ -160,6 +162,13 @@ page_fault (struct intr_frame *f)
   bool success = false;
   struct frame *frame;
   struct page_table_entry *pte;
+  struct thread *curr = thread_current();
+
+  //printf("page faulted\n");
+
+  if(user){
+    curr->esp = f->esp;
+  }
 
   /*읽기 전용 페이지에 쓰기를 시도할 경우*/
   if(!not_present){
@@ -177,10 +186,24 @@ page_fault (struct intr_frame *f)
 
   if(pte == NULL){
     //printf("you should make stack expand\n");
-    exit(-1);
+    if(fault_addr < curr->esp - 32){
+      //printf("fault1\n");
+      exit(-1);
+    }
+
+    if(!(fault_addr < PHYS_BASE && fault_addr >= PHYS_BASE - MAX_STACK_SIZE)){
+      //printf("fault2\n");
+      exit(-1);
+    }
+
+    success = stack_growth(fault_addr);
+    if(!success){
+      exit(-1);
+    }
   }
 
   else{
+    //printf("frame alloc\n");
     frame = frame_alloc();
     if(frame != NULL){
 

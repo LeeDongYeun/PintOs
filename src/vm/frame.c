@@ -15,8 +15,14 @@ frame_alloc(){
 	void *page = palloc_get_page(PAL_USER);
 	struct frame *f = malloc(sizeof(struct frame));
 
+	if(f== NULL){
+		printf("frame_alloc - malloc failed\n");
+		palloc_free_page(page);
+		return NULL;
+	}
+
 	f->addr = page;
-	f->accessable = true;
+	f->accessable = false;
 
 	return f;
 }

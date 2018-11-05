@@ -11,9 +11,12 @@
 #include "threads/switch.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
-#include "vm/page.h"
 #ifdef USERPROG
 #include "userprog/process.h"
+#endif
+
+#ifdef VM
+#include "vm/page.h"
 #endif
 
 /* Random value for struct thread's `magic' member.
@@ -230,6 +233,10 @@ thread_create (const char *name, int priority,
    현재 쓰레드의 child_list 에  넣는다*/
   list_push_back(&thread_current()->child_list, &t->child_elem);
 
+#ifdef VM
+  page_table_init(&t->page_table);
+#endif
+  
   /* Stack frame for kernel_thread(). */
   kf = alloc_frame (t, sizeof *kf);
   kf->eip = NULL;
@@ -510,7 +517,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->file = NULL;
   t->load_status = false;
 
-  page_table_init(&t->page_table);
+  //page_table_init(&t->page_table);
 
 }
 

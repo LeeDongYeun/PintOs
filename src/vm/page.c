@@ -37,6 +37,7 @@ page_hash_destroy_func(struct hash_elem *e, void *aux UNUSED){
 
 void
 page_table_init(struct hash *pt){
+	ASSERT(pt !=NULL);
 	hash_init(pt, page_hash_func, page_hash_less_func, NULL);
 }
 
@@ -76,14 +77,13 @@ page_table_delete(struct page_table_entry *pte){
 
 struct page_table_entry *
 page_table_find(void *uaddr){
-	ASSERT(&thread_current()->page_table != NULL);
+	//ASSERT(&thread_current()->page_table != NULL);
 
-	struct hash *page_table = &thread_current()->page_table;
-	struct page_table_entry *pte;
+	struct page_table_entry pte;
 	struct hash_elem *e;
 
-	pte->vaddr = pg_round_down(uaddr);
-	e = hash_find(page_table, &pte->vaddr);
+	pte.vaddr = pg_round_down(uaddr);
+	e = hash_find(&thread_current()->page_table, &pte.vaddr);
 
 	if(e == NULL)
 		return NULL;

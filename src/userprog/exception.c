@@ -4,6 +4,14 @@
 #include "userprog/gdt.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
+#include "threads/vaddr.h"
+#include "userprog/process.h"
+#include "userprog/pagedir.h"
+
+#ifdef VM
+#include "vm/page.h"
+#include "vm/frame.h"
+#endif
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;
@@ -148,6 +156,51 @@ page_fault (struct intr_frame *f)
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
   
+#ifdef VM
+  bool success = false;
+  struct frame *frame;
+  struct page_table_entry *pte;
+
+  /*읽기 전용 페이지에 쓰기를 시도할 경우*/
+  if(!not_present){
+    //printf("write to read only page\n");
+    exit(-1);
+  }
+
+  /*페이지가 커널 가상 메모리에 있는 경우*/
+  if(is_kernel_vaddr(fault_addr)){
+    //printf("is kernel vaddr\n ");
+    exit(-1);
+  }
+
+  pte = page_table_find(fault_addr);
+
+  if(pte == NULL){
+    //printf("you should make stack expand\n");
+    exit(-1);
+  }
+
+  else{
+    frame = frame_alloc();
+    if(frame != NULL){
+
+      frame_add(frame);
+      frame_set_accessable(frame, true);
+
+      pte->frame = frame;   
+
+      success = install_page(pte->vaddr, frame->addr, write);
+      if(!success){
+        /*install_page 함수가 success가 안되면 페이지 테이블에서 제거하고 
+        프레임 테이블에서도 제거해준다*/
+        page_table_delete(pte);
+        exit(-1);
+      }
+    }
+  }
+
+
+#else
   f->eip = f->eax;
   f->eax = 0xffffffff;
   
@@ -161,5 +214,6 @@ page_fault (struct intr_frame *f)
           // write ? "writing" : "reading",
           // user ? "user" : "kernel");
   // kill (f);
+#endif
 }
 

@@ -10,4 +10,11 @@ struct page_table_entry{
 	struct hash_elem elem;
 };
 
+void page_table_init(struct hash *pt);
+void page_table_destroy(struct hash *pt);
+struct page_table_entry *page_table_entry_alloc(void *uaddr, struct frame *frame);
+void page_table_add(struct page_table_entry *pte);
+void page_table_delete(struct page_table_entry *pte);
+struct page_table_entry *page_table_find(void *uaddr);
+
 #endif

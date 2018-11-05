@@ -18,10 +18,13 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "vm/frame.h"
+#include "vm/page.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 
+bool install_page (void *upage, void *kpage, bool writable);
 int argument_count(char *parse);
 void argv_put_stack(char *parse,int count, void **esp);
 /* Starts a new thread running a user program loaded from
@@ -171,7 +174,9 @@ process_exit (void)
   file_close(curr->file);
   //printf("process_exit - file closed\n");
 
-  
+#ifdef VM
+  page_table_destroy(&curr->page_table);
+#endif
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   pd = curr->pagedir;
@@ -421,7 +426,6 @@ load (const char *cmd_line, void (**eip) (void), void **esp)
 
 /* load() helpers. */
 
-static bool install_page (void *upage, void *kpage, bool writable);
 
 /* Checks whether PHDR describes a valid, loadable segment in
    FILE and returns true if so, false otherwise. */
@@ -532,19 +536,48 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 static bool
 setup_stack (void **esp) 
 {
-  uint8_t *kpage;
+  void *upage = ((uint8_t *) PHYS_BASE) - PGSIZE;
   bool success = false;
 
+#ifdef VM
+  struct frame *frame;
+  struct page_table_entry *pte;
+
+  /*프레임을 생성한 후 프레임 리스트에 추가한다*/
+  frame = frame_alloc();
+  if(frame != NULL){
+
+    frame_add(frame);
+    frame_set_accessable(frame, true);
+
+    /*page table entry를 생성한 후 페이지 테이블에 넣어준다*/
+    pte = page_table_entry_alloc(upage, frame);
+    page_table_add(pte);
+
+    success = install_page(upage, frame->addr, true);
+    if(success)
+      *esp = PHYS_BASE;
+    else
+      /*install_page 함수가 success가 안되면 페이지 테이블에서 제거하고 
+      프레임 테이블에서도 제거해준다*/
+      page_table_delete(pte);
+  }
+  return success;
+
+#else
+  uint8_t *kpage;
   kpage = palloc_get_page (PAL_USER | PAL_ZERO);
   if (kpage != NULL) 
     {
-      success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
+      success = install_page (upage, kpage, true);
       if (success)
         *esp = PHYS_BASE;
       else
         palloc_free_page (kpage);
     }
   return success;
+
+#endif
 }
 
 /* Adds a mapping from user virtual address UPAGE to kernel
@@ -556,7 +589,7 @@ setup_stack (void **esp)
    with palloc_get_page().
    Returns true on success, false if UPAGE is already mapped or
    if memory allocation fails. */
-static bool
+bool
 install_page (void *upage, void *kpage, bool writable)
 {
   struct thread *t = thread_current ();

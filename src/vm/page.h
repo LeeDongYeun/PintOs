@@ -4,11 +4,23 @@
 #include <hash.h>
 #include "frame.h"
 
+enum pte_type{
+	PTE_SWAP,
+	PTE_FILE,
+};
+
 struct page_table_entry{
+	enum pte_type type;
 	void *vaddr;
 	struct frame *frame;
-	struct hash_elem elem;
 	int swap_table_index;
+	
+	struct file *file;
+	int offset;
+	int read_bytes;
+	int zero_bytes;
+
+	struct hash_elem elem;
 };
 
 void page_table_init(struct hash *pt);

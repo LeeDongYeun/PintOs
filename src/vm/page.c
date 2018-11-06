@@ -54,9 +54,29 @@ page_table_entry_alloc(void *uaddr, struct frame *frame){
 		printf("page_table_entry_alloc failed\n");
 		return false;
 	}
-	pte->vaddr = uaddr;
+	pte->type = PTE_SWAP;
+	pte->vaddr = pg_round_down(uaddr);
 	pte->frame = frame;
 	pte->swap_table_index = -1;
+
+	return pte;
+}
+
+struct page_table_entry *
+page_table_entry_file(void *uaddr, struct file *file, int offset, int read_bytes, int zero_bytes){
+	struct page_table_entry *pte = malloc(sizeof(struct page_table_entry));
+	if(pte == NULL){
+		printf("page_table_entry_alloc failed\n");
+		return false;
+	}
+	pte->type = PTE_FILE;
+	pte->vaddr = pg_round_down(uaddr);
+	pte->swap_table_index = -1;
+
+	pte->file = file;
+	pte->offset = offset;
+	pte->read_bytes = read_bytes;
+	pte->zero_bytes = zero_bytes;
 
 	return pte;
 }

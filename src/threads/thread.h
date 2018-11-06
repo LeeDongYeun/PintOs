@@ -4,6 +4,9 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
+#include <hash.h>
+#include "synch.h"
+#include "filesys/file.h"
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -95,10 +98,20 @@ struct thread
     /*[project2]*/
     int fd;                             /*file discriptor [project2-syscall] */
     struct list file_list;              /*list of open file [project2=syscall] */
-    int parent_tid;
-    int wait_tid;
-    struct list child_list;
-    struct list_elem all_elem;
+    struct list_elem all_elem;          /*store all thread*/
+    struct list child_list;             /*store child thread(process)*/
+    struct list_elem child_elem;        /*list_elem for child_list*/
+    int exit_status;                    /*exit_status that child gives to parent process*/
+    struct semaphore sema_wait;         /*semaphore for wait child process*/
+    struct semaphore sema_load;         /*semaphore for waiting loading of child*/
+    struct semaphore sema_destroy;      /*semaphore for waiting child destroy*/
+    struct file *file;                  /*to control the other write process while process using file*/
+    bool load_status;                   /*to control load*/
+
+    /*[project3]*/
+    struct hash page_table;
+    void *esp;
+
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
@@ -109,13 +122,6 @@ struct thread
     unsigned magic;                     /* Detects stack overflow. */
   };
 
-  struct child
-{
-  int pid;
-  bool is_exited;
-  int status;
-  struct list_elem elem;
-};
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.

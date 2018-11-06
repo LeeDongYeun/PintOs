@@ -18,12 +18,16 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "vm/frame.h"
+#include "vm/page.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 
+bool install_page (void *upage, void *kpage, bool writable);
 int argument_count(char *parse);
 void argv_put_stack(char *parse,int count, void **esp);
+void stack_growth(void *addr);
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
@@ -32,43 +36,34 @@ tid_t
 process_execute (const char *cmd_line) 
 {
   char *file_name;
+  char *cmd_line2;
   tid_t tid;
 
-  char *argv = malloc(128);
   char *address = NULL;
-
-  strlcpy(argv, cmd_line, strlen(cmd_line)+1);
 
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
   file_name = palloc_get_page (0);
-  if (file_name == NULL)
+  cmd_line2 = palloc_get_page (0);
+  if (file_name == NULL || cmd_line2 == NULL)
     return TID_ERROR;
-  
-  file_name = strtok_r(argv, " ", &address);
+
+  strlcpy(cmd_line2, cmd_line, strlen(cmd_line)+1);
+  strlcpy(file_name, cmd_line, strlen(cmd_line)+1);
+  file_name = strtok_r(file_name, " ", &address);
 
   /* Create a new thread to execute FILE_NAME. */
-  printf("%s %s\n",file_name,cmd_line);
-  tid = thread_create (file_name, PRI_DEFAULT, start_process, cmd_line);
+  //printf("%s %s\n",file_name,cmd_line);
+  tid = thread_create (file_name, PRI_DEFAULT, start_process, cmd_line2);
+  
   if (tid == TID_ERROR)
   {
-    palloc_free_page (file_name); 
-    return -1;
+    palloc_free_page (cmd_line2); 
   }
 
-  struct thread *child_thread = get_thread(tid);
-  struct thread *curr = thread_current();
-  child_thread->parent_tid = curr -> tid;
+  palloc_free_page(file_name);
 
-  struct child *child_t;
-  child_t -> pid = tid;
-  child_t -> is_exited = false;
-  child_t -> status = -1;
-
-  list_push_back(&curr->child_list,&child_t -> elem);
-
-  free(argv);
-  printf("process_execute done\n");
+  //printf("process_execute done\n");
 
   return tid;
 }
@@ -78,35 +73,33 @@ process_execute (const char *cmd_line)
 static void
 start_process (void *cmd_line)
 {
-  char *file_name;
+  char *cmd_line2;
   struct intr_frame if_;
   bool success;
 
-  char *argv = malloc(128);
-  char *address = NULL;
-
-  printf("adfad\n");
-
-  strlcpy(argv, cmd_line, strlen(cmd_line));
-  file_name = strtok_r(argv, " ", &address);
+  cmd_line2 = cmd_line;
 
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
-  success = load (cmd_line, &if_.eip, &if_.esp);
-  printf("load successed\n");
+  success = load (cmd_line2, &if_.eip, &if_.esp);
+  //printf("load successed\n");
+  //printf("success = %d\n", success);
+  thread_current()-> load_status = success;
 
+  sema_up(&thread_current()->sema_load);
+
+  //printf("start process = sema up\n");
+
+  palloc_free_page(cmd_line2);
   /* If load failed, quit. */
-  //palloc_free_page (file_name); -> 현재 여기서 걸림
-  free(argv);
-
-  if (!success){
-    palloc_free_page (file_name);
-    printf("palloc free page file name\n");
+  if (!success)
     thread_exit ();
-  } 
+
+  //printf("start_process over 1\n");
+  //printf("argv_put_stack - esp = %p\n", *(&if_.esp));
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -130,87 +123,61 @@ start_process (void *cmd_line)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
-  printf("asdf\n");
-  struct thread *child = get_thread(child_tid);
-  struct list_elem * e;
-  struct thread *curr = thread_current();
-  struct child *child_t;
-  bool buf = false;
+  struct thread *child_process;
+  int status;
 
-  /*현재 프로세스가 tid 값이 child_tid인 process를 child로 가졌는지 확인한다*/
-  for(e=list_begin(&curr->child_list);e!=list_end(&curr->child_list);e=list_next(e))
-  {
-    child_t = list_entry(e,struct child,elem);
-    if(child_t->pid == child_tid)
-    {
-      buf = true;
-      break;
-    }
-  }
-  printf("sdfg\n");
+  //printf("process_wait started\n");
+  //printf("child_tid = %d\n", child_tid);
 
-  /*자식 프로세스가 존재하는지 확인*/
-  if(!buf)
-  {
-    printf("1\n");
+  child_process = get_child_thread(child_tid);
+  if(child_process == NULL){
+    //printf("child_process is NULL\n");
     return -1;
   }
-  /*자식 프로세스가 이미 종료되었다면 is_exited를 리턴*/
-  else if(child_t->is_exited)
-  {
-    printf("2\n");
-    return child_t->status;
-  }
-  /*자식 프로세스가 종료될 때까지 기다렸다가 리턴*/
-  else
-  {
-    printf("3\n");  
-    curr -> wait_tid = child -> tid;
+  if(child_process == thread_current())
+    return -1;
+  //printf("sema_down\n");
+  sema_down(&child_process->sema_wait);
+  //printf("sema_up\n");
 
-    enum intr_level old_level;
-    old_level = intr_disable();
-    thread_block();
-    intr_set_level(old_level);
+  status = child_process->exit_status;
 
-    if (!(child_t->is_exited))
-    {
-      return -1;
-    }
-    return child_t->status;
-  }
+  list_remove(&child_process->child_elem);
+  //printf("child exit status = %d\n", status);
+
+  sema_up(&child_process->sema_destroy);
+  //printf("process_wiat sema_destroy_up\n");
+
+  return status;
 }
 
 /* Free the current process's resources. */
 void
 process_exit (void)
 {
+  //printf("process_exit started\n");
+
   struct thread *curr = thread_current ();
   uint32_t *pd;
-  struct file_descriptor *file_des;
+
   struct list_elem *e;
+  struct file_descriptor *file_descriptor;
 
+  ASSERT (&curr->file_list != NULL);
 
-  while(!list_empty(&curr->file_list))
-  {
-    file_des = list_entry(list_pop_back(&curr->file_list),struct file_descriptor,elem);
-    close(file_des -> fd);
+  for(e = list_begin(&curr->file_list); e != list_end(&curr->file_list); e = list_next(e)){
+    file_descriptor = list_entry(e, struct file_descriptor, elem);
+    
+    list_remove(&file_descriptor->elem);
+    file_close(file_descriptor->file);
+    //free(file_descriptor);
   }
+  file_close(curr->file);
+  //printf("process_exit - file closed\n");
 
-  while(!list_empty(&curr->child_list))
-  {
-    struct child *child_t = list_entry(list_pop_back(&curr->child_list),struct child,elem);
-    free(child_t);
-  }
-
-  struct thread *parent = get_thread(curr->parent_tid);
-  for(e=list_begin(&parent->child_list);e!=list_end(&parent->child_list);e=list_next(e))
-  {
-    struct child* pchild_t = list_entry(e,struct child,elem);
-    if(pchild_t -> pid == curr -> tid)
-    {
-      pchild_t -> is_exited = true;
-    }
-  }
+#ifdef VM
+  page_table_destroy(&curr->page_table);
+#endif
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   pd = curr->pagedir;
@@ -228,8 +195,7 @@ process_exit (void)
       pagedir_destroy (pd);
     
     }
-    thread_unblock(parent);
-  }
+}
 
 /* Sets up the CPU for running user code in the current
    thread.
@@ -332,16 +298,16 @@ load (const char *cmd_line, void (**eip) (void), void **esp)
 
   char *file_name;
 
-  printf("load -> cmd_line = %s\n", cmd_line);
+  //printf("load -> cmd_line = %s\n", cmd_line);
 
   char *argv = malloc(128);
   char *address = NULL;
 
   strlcpy(argv, cmd_line, 128);
-  printf("load -> argv = %s\n", argv);
+  //printf("load -> argv = %s\n", argv);
 
   file_name = strtok_r(argv, " ", &address);
-  printf("load -> file_name = %s\n", file_name);
+  //printf("load -> file_name = %s\n", file_name);
 
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create ();
@@ -365,8 +331,9 @@ load (const char *cmd_line, void (**eip) (void), void **esp)
       || ehdr.e_version != 1
       || ehdr.e_phentsize != sizeof (struct Elf32_Phdr)
       || ehdr.e_phnum > 1024) 
-    { printf("file_read (file, &ehdr, sizeof ehdr) = %d, %d\n", file_read (file, &ehdr, sizeof ehdr), sizeof ehdr);
-      printf("ehdr.e_type = %d, 2\n",ehdr.e_type);
+    { 
+      //printf("file_read (file, &ehdr, sizeof ehdr) = %d, %d\n", file_read (file, &ehdr, sizeof ehdr), sizeof ehdr);
+      //printf("ehdr.e_type = %d, 2\n",ehdr.e_type);
       printf ("load: %s: error loading executable\n", file_name);
       goto done; 
     }
@@ -429,28 +396,37 @@ load (const char *cmd_line, void (**eip) (void), void **esp)
           break;
         }
     }
-    free(argv);
+    
+
+  t->file = file;
+  file_deny_write(file);
+
   /* Set up stack. */
   if (!setup_stack (esp))
     goto done;
-  printf("adf\n");
+
   argv_put_stack(cmd_line,argument_count(cmd_line), esp);
-  hex_dump(0xbfffffb4, 0xbfffffb4, sizeof(char)*100, true);
+  //hex_dump(0xbfffffb4, 0xbfffffb4, sizeof(char)*100, true);
   /* Start address. */
   *eip = (void (*) (void)) ehdr.e_entry;
 
   success = true;
 
  done:
-  /* We arrive here whether the load is successful or not. */
-  file_close (file);
-  printf("file closed\n");
+  free(argv);
+  if(success)
+  {
+    thread_current()->file = file;
+    file_deny_write(file);
+    //printf("file_deny_write\n");
+  }
+  else
+    file_close (file);
   return success;
 }
 
 /* load() helpers. */
 
-static bool install_page (void *upage, void *kpage, bool writable);
 
 /* Checks whether PHDR describes a valid, loadable segment in
    FILE and returns true if so, false otherwise. */
@@ -561,19 +537,48 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 static bool
 setup_stack (void **esp) 
 {
-  uint8_t *kpage;
+  void *upage = ((uint8_t *) PHYS_BASE) - PGSIZE;
   bool success = false;
 
+#ifdef VM
+  struct frame *frame;
+  struct page_table_entry *pte;
+
+  /*프레임을 생성한 후 프레임 리스트에 추가한다*/
+  frame = frame_alloc();
+  if(frame != NULL){
+
+    frame_add(frame);
+    frame_set_accessable(frame, true);
+
+    /*page table entry를 생성한 후 페이지 테이블에 넣어준다*/
+    pte = page_table_entry_alloc(upage, frame);
+    page_table_add(pte);
+
+    success = install_page(upage, frame->addr, true);
+    if(success)
+      *esp = PHYS_BASE;
+    else
+      /*install_page 함수가 success가 안되면 페이지 테이블에서 제거하고 
+      프레임 테이블에서도 제거해준다*/
+      page_table_delete(pte);
+  }
+  return success;
+
+#else
+  uint8_t *kpage;
   kpage = palloc_get_page (PAL_USER | PAL_ZERO);
   if (kpage != NULL) 
     {
-      success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
+      success = install_page (upage, kpage, true);
       if (success)
         *esp = PHYS_BASE;
       else
         palloc_free_page (kpage);
     }
   return success;
+
+#endif
 }
 
 /* Adds a mapping from user virtual address UPAGE to kernel
@@ -585,7 +590,7 @@ setup_stack (void **esp)
    with palloc_get_page().
    Returns true on success, false if UPAGE is already mapped or
    if memory allocation fails. */
-static bool
+bool
 install_page (void *upage, void *kpage, bool writable)
 {
   struct thread *t = thread_current ();
@@ -604,7 +609,7 @@ argument_count(char *parse)
   char *address = NULL;
   int i = 0;
   
-  strlcpy(argv, parse, strlen(parse));
+  strlcpy(argv, parse, strlen(parse)+1);
   
   token = strtok_r(argv, " ", &address);
   
@@ -630,6 +635,7 @@ argv_put_stack(char *parse,int count, void **esp)
   int align;
   int i = 0;
   
+  //printf("count = %d", count);
   strlcpy(argv, parse, strlen(parse)+1);
   
   token = strtok_r(argv, " ", &address);
@@ -638,11 +644,12 @@ argv_put_stack(char *parse,int count, void **esp)
   /*argv를 쪼개서 buff에 집어 넣는다*/
   while(token != NULL)
   {
-    printf("token = %s\n", token);
+    //printf("token = %s\n", token);
     buff[i] = token;
     token = strtok_r(NULL, " ", &address);
     i++;
   }
+  //printf("argv_put_stack - esp = %p\n", *esp);
    
   /*buff에서 끝에서부터 esp에 넣어준다*/ 
   for(i = count-1; i>=0;i--){
@@ -650,20 +657,21 @@ argv_put_stack(char *parse,int count, void **esp)
     *esp = *esp - arg_len;
     memcpy(*esp, buff[i], arg_len);
     buff[i] = *esp;
+    //printf("argv_put_stack - esp = %p\n", *esp);
   }
-  
 
   buff[count] = 0;
   /*8바이트로 맞추어준다*/
   align = ((int)*esp) & 3;
   *esp = *esp - align;
-
+  //printf("argv_put_stack - esp = %p\n", *esp);
   /*스택에 argv들의 주소값을 집어 넣는다*/
   
   for(i=count;i>=0;i--)
   {
     *esp = *esp - 4;
     memcpy(*esp, &buff[i], 4);
+    //printf("argv_put_stack - esp = %p\n", *esp);
   }
   
   /*스택에 argv의 주소값을 가지고 있는 주소값을 넣는다*/
@@ -671,15 +679,50 @@ argv_put_stack(char *parse,int count, void **esp)
   argv_ptr = *esp;
   *esp = *esp - 4;
   memcpy(*esp,&argv_ptr,4);
+  //printf("argv_put_stack - esp = %p\n", *esp);
 
   /*스택에 argv의 개수를 넣는다*/
   *esp = *esp - 4;
   memcpy(*esp,&count,4);
-  
+  //printf("argv_put_stack - esp = %p\n", *esp);
   /*return address를 넣는다*/
   *esp = *esp - 4;
   memset(*esp,0,4);
 
   free(buff);
   free(argv);
+
+  //printf("argv_put_stack - esp = %p\n", *esp);
 }
+
+void
+stack_growth(void *addr){
+  struct frame *frame;
+  struct page_table_entry *pte;
+  void *upage = pg_round_down(addr);
+  bool success = false;
+
+  //printf("stack_growth start\n");
+
+  /*프레임을 생성한 후 프레임 리스트에 추가한다*/
+  frame = frame_alloc();
+  if(frame != NULL){
+
+    frame_add(frame);
+    frame_set_accessable(frame, true);
+
+    /*page table entry를 생성한 후 페이지 테이블에 넣어준다*/
+    pte = page_table_entry_alloc(upage, frame);
+    page_table_add(pte);
+
+    success = install_page(upage, frame->addr, true);
+      
+    if(!success)
+      /*install_page 함수가 success가 안되면 페이지 테이블에서 제거하고 
+      프레임 테이블에서도 제거해준다*/
+      page_table_delete(pte);
+  }
+  return success;
+
+}
+

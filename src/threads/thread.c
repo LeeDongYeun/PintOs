@@ -15,6 +15,10 @@
 #include "userprog/process.h"
 #endif
 
+#ifdef VM
+#include "vm/page.h"
+#endif
+
 /* Random value for struct thread's `magic' member.
    Used to detect stack overflow.  See the big comment at the top
    of thread.h for details. */
@@ -38,6 +42,8 @@ static struct thread *initial_thread;
 static struct lock tid_lock;
 
 static struct list file_list;
+
+static struct list child_list;
 
 /* Stack frame for kernel_thread(). */
 struct kernel_thread_frame 
@@ -91,6 +97,24 @@ get_thread(int tid)
     }
   }
   return NULL;
+}
+
+struct thread *
+get_child_thread(int tid){
+  struct thread * result;
+  struct list_elem * e;
+
+  for(e=list_begin(&thread_current()->child_list);
+    e!=list_end(&thread_current()->child_list);e=list_next(e))
+  {
+    result = list_entry(e,struct thread,child_elem);
+    if(result->tid == tid)
+    {
+      return result;
+    }
+  }
+  return NULL;
+
 }
 
 /* Initializes the threading system by transforming the code
@@ -205,6 +229,14 @@ thread_create (const char *name, int priority,
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
 
+  /*added for project 2
+   현재 쓰레드의 child_list 에  넣는다*/
+  list_push_back(&thread_current()->child_list, &t->child_elem);
+
+#ifdef VM
+  page_table_init(&t->page_table);
+#endif
+  
   /* Stack frame for kernel_thread(). */
   kf = alloc_frame (t, sizeof *kf);
   kf->eip = NULL;
@@ -220,7 +252,7 @@ thread_create (const char *name, int priority,
   sf->eip = switch_entry;
 
   /* Add to run queue. */
-  thread_unblock (t);
+  thread_unblock (t);  
 
   return tid;
 }
@@ -277,6 +309,7 @@ struct thread *
 thread_current (void) 
 {
   struct thread *t = running_thread ();
+  //printf("thread_current pid %d\n", t->tid);
   
   /* Make sure T is really a thread.
      If either of these assertions fire, then your thread may
@@ -301,12 +334,20 @@ thread_tid (void)
 void
 thread_exit (void) 
 {
+
   ASSERT (!intr_context ());
 
 #ifdef USERPROG
   process_exit ();
+  //printf("thread_exit - process_exit\n");
 #endif
+  /*project2 added*/
 
+  sema_up(&thread_current()->sema_wait);
+  //printf("thread_exit - sema_up\n");
+  sema_down(&thread_current()->sema_destroy);
+
+  list_remove(&thread_current()->all_elem);
   /* Just set our status to dying and schedule another process.
      We will be destroyed during the call to schedule_tail(). */
   intr_disable ();
@@ -467,10 +508,16 @@ init_thread (struct thread *t, const char *name, int priority)
   /*project2*/
   list_init(&t->file_list);
   t->fd = 2;
-  list_init(&t->child_list);
-  t->parent_tid = -1;
-  t->wait_tid = -1;
   list_push_back(&all_thread,&t->all_elem);
+  list_init(&t->child_list);
+  t->exit_status = NULL;
+  sema_init(&t->sema_wait, 0);
+  sema_init(&t->sema_load, 0);
+  sema_init(&t->sema_destroy, 0);
+  t->file = NULL;
+  t->load_status = false;
+
+  //page_table_init(&t->page_table);
 
 }
 

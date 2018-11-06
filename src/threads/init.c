@@ -20,6 +20,7 @@
 #include "threads/palloc.h"
 #include "threads/pte.h"
 #include "threads/thread.h"
+
 #ifdef USERPROG
 #include "userprog/process.h"
 #include "userprog/exception.h"
@@ -29,10 +30,16 @@
 #else
 #include "tests/threads/tests.h"
 #endif
+
 #ifdef FILESYS
 #include "devices/disk.h"
 #include "filesys/filesys.h"
 #include "filesys/fsutil.h"
+#endif
+
+#ifdef VM
+#include "vm/frame.h"
+#include "vm/page.h"
 #endif
 
 /* Amount of physical memory, in 4 kB pages. */
@@ -113,6 +120,10 @@ main (void)
   /* Initialize file system. */
   disk_init ();
   filesys_init (format_filesys);
+#endif
+
+#ifdef VM
+  frame_table_init();
 #endif
 
   printf ("Boot complete.\n");
@@ -374,8 +385,10 @@ power_off (void)
   printf ("Powering off...\n");
   serial_flush ();
 
-  for (p = s; *p != '\0'; p++)
+  for (p = s; *p != '\0'; p++){
     outb (0x8900, *p);
+    outw (0xB004, 0x2000);
+  }
   asm volatile ("cli; hlt" : : : "memory");
   printf ("still running...\n");
   for (;;);

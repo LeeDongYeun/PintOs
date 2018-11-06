@@ -16,7 +16,6 @@
 typedef int pid_t;
 
 static void syscall_handler (struct intr_frame *);
-void *check_pointer(void *ptr);
 
 void halt(void);
 void exit(int status);
@@ -34,10 +33,11 @@ void close(int fd);
 
 struct file *get_file(int fd);
 
-
 static int 
 get_user (const uint8_t *uaddr)
 {
+	if(uaddr >= PHYS_BASE)
+  		return -1;
 	int result;
 	asm ("movl $1f, %0; movzbl %1, %0; 1:"
 		: "=&a" (result) : "m" (*uaddr));
@@ -49,14 +49,15 @@ int get_argv(char *ptr)
 	unsigned temp1 = get_user(ptr);
 	unsigned temp2 = get_user(ptr+1);
 	unsigned temp3 = get_user(ptr+2);
-	unsigned temp4 = get_user(ptr+3);;
+	unsigned temp4 = get_user(ptr+3);
+
 	
 	if(temp1 == -1 || temp2 == -1 || temp3 == -1 || temp4 == -1)
-	{
+	{	
 		exit(-1);
 	}
 	else
-	{
+	{	
 		return temp1 + (temp2 << 8) + (temp3 << 16) + (temp4 << 24);
 	}
 }
@@ -71,94 +72,80 @@ open함수에서 file을 오픈할 때마다 1씩 증가한다
 void
 syscall_init (void) 
 {
-	intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 	lock_init(&lock_filesys);
+	intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
+	
 }
 
 static void
 syscall_handler (struct intr_frame *f) 
-{
-	int esp_val = get_argv(f->esp);
+{	
+	int esp_val = (get_argv(f->esp));
+	//check_pointer(esp_val);
+
+	//printf("handler esp = %p", f->esp);
+	//printf("esp_val = %d\n", esp_val);
 	
+	//printf("syscall_handler started\n");
+
 	switch(esp_val){
 	  	case SYS_HALT:
 	  		halt();
 	  		break;
 
 	  	case SYS_EXIT:
-	  		exit((int)get_argv(esp_val+4));
+	  		//printf("SYS_EXIT\n");
+	  		exit((int)get_argv((int *)f->esp+1));
 	  		break;
 
 	  	case SYS_EXEC:
-	  		f -> eax = (uint32_t) exec((char*)get_argv(esp_val+4));
+	  		f -> eax = (uint32_t) exec((char*)get_argv((int *)f->esp+1));
 	  		break;
 
 	  	case SYS_WAIT:
-	  		f -> eax = (uint32_t) wait((int)get_argv(esp_val+4));
+	  		f -> eax = (uint32_t) wait((int)get_argv((int *)f->esp+1));
 	  		break;
 
 	  	case SYS_CREATE:
-	  		f -> eax = create((char *)get_argv(esp_val+4), (unsigned)get_argv(esp_val+8));
+	  		f -> eax = create((char *)get_argv((int *)f->esp+1), (unsigned)get_argv((int *)f->esp+2));
 	  		break;
 
 	  	case SYS_REMOVE:
-	  		f -> eax = remove((char *)get_argv(esp_val+4));
+	  		f -> eax = remove((char *)get_argv((int *)f->esp+1));
 	  		break;
 
 	  	case SYS_OPEN:
-	  		f -> eax = open((char *)get_argv(esp_val+4));
+	  		f -> eax = open((char *)get_argv((int *)f->esp+1));
 	  		break;
 
 	  	case SYS_FILESIZE:
-	  		f -> eax = filesize((int)get_argv(esp_val+4));
+	  		f -> eax = filesize((int)get_argv((int *)f->esp+1));
 	  		break;
 
 	  	case SYS_READ:
-	  		f -> eax = read((int)get_argv(esp_val+4), (void *)get_argv(esp_val+8), (unsigned)get_argv(esp_val+12));
+	  		f -> eax = read((int)get_argv((int *)f->esp+1), (void *)get_argv((int *)f->esp+2), (unsigned)get_argv((int *)f->esp+3));
 	  		break;
 
 	  	case SYS_WRITE:
-	  		f -> eax = write((int)get_argv(esp_val+4), (void *)get_argv(esp_val+8), (unsigned)get_argv(esp_val+12));
+	  		//printf("SYS_WRITE\n");
+	  		f -> eax = write((int)get_argv((int *)f->esp+1), (void *)get_argv((int *)f->esp+2), (unsigned)get_argv((int *)f->esp+3));
 	  		break;
 
 	  	case SYS_SEEK:
-	  		seek((int)get_argv(esp_val+4), (unsigned)get_argv(esp_val+8));
+	  		seek((int)get_argv((int *)f->esp+1), (unsigned)get_argv((int *)f->esp+2));
 	  		break;
 
 	  	case SYS_TELL:
-	  		f -> eax = tell((int)get_argv(esp_val+4));
+	  		f -> eax = tell((int)get_argv((int *)f->esp+1));
 	  		break;
 
 	  	case SYS_CLOSE:
-	  		close((int)get_argv(esp_val+4));
+	  		close((int)get_argv((int *)f->esp+1));
 	  		break;
-
-	  	default :
-	  		exit(-1);
 	}
 	
 }
 
-void*
-check_pointer(void *ptr){
-	void *result = 0;
-	if(ptr >= PHYS_BASE){
-		exit(-1);
-	}
-
-	else{
-
-		void *pointer = pagedir_get_page(thread_current()->pagedir, ptr);
-		if(!pointer){
-			exit(-1);
-		}
-		else{
-			result = ptr;
-		}
-	}
-
-	return result;
-}
 
 /*
 현재 thread에 있는 file_list에서 fd가 같은 값을 찾은 후 file에 대한
@@ -192,30 +179,31 @@ void
 exit(int status)
 {
 	struct thread *curr = thread_current ();
-
+	curr->exit_status = status;
 	printf("%s: exit(%d)\n", curr->name, status);
 
-  	struct thread *parent = get_thread(curr->parent_tid);
-  	struct list_elem *e;
-  	for(e=list_begin(&parent->child_list);e!=list_end(&parent->child_list);e=list_next(e))
-  	{
-    	struct child* pchild_t = list_entry(e,struct child, elem);
-    	if(pchild_t -> pid == curr->tid)
-   		{
-      		pchild_t -> status = status;
-      		break;
-    	}
-		process_exit();
-	}
-	if(parent->wait_tid == curr -> tid)
-  	{
-    	thread_unblock(parent);
-  	}
+  	thread_exit();
 }
 
 pid_t
 exec(const char *cmd_line){
-	return process_execute(cmd_line);
+	//printf("syscall_handler - exec\n");
+	int tid;
+	struct thread *child_process;
+
+	if(cmd_line == NULL)
+		return -1;
+
+	tid = process_execute(cmd_line);
+	child_process = get_child_thread(tid);
+
+	if(child_process != NULL){
+		sema_down(&child_process->sema_load);
+		if(!child_process->load_status)
+			return -1;
+	}
+	
+	return tid;
 }
 
 
@@ -229,6 +217,9 @@ bool
 create(const char *file, unsigned initial_size){
 	bool result;
 
+	if(file==NULL)
+		exit(-1);
+
 	lock_acquire(&lock_filesys);
 	result = filesys_create(file, initial_size);
 	lock_release(&lock_filesys);
@@ -239,7 +230,8 @@ create(const char *file, unsigned initial_size){
 bool
 remove(const char *file){
 	bool result;
-	
+
+	//check_pointer(file);
 	lock_acquire(&lock_filesys);
 	result = filesys_remove(file);
 	lock_release(&lock_filesys);
@@ -253,16 +245,24 @@ file_descriptor라는 구조체를 저장한다. 그 후 fd를 증가시켜 준�
 */
 int
 open(const char *file){
-	bool result;
 
+	if(file ==NULL)
+		return -1;
+	int result;
+
+	struct thread *curr = thread_current();
+	//check_pointer(file);
 	lock_acquire(&lock_filesys);
 	struct file *f = filesys_open(file);
-	if(!file){
+	lock_release(&lock_filesys);
+	
+	if(!f){
 		result = -1;
 	}
+
 	else{
-		struct thread *curr = thread_current();
-		struct file_descriptor *file_descriptor;
+		
+		struct file_descriptor *file_descriptor = malloc(sizeof(struct file_descriptor));
 		
 		file_descriptor->file = f;
 		file_descriptor->fd = curr->fd;
@@ -270,7 +270,7 @@ open(const char *file){
 		result = curr->fd;
 		curr->fd++;
 	}
-	lock_release(&lock_filesys);
+	
 
 	return result;
 }
@@ -306,7 +306,8 @@ int
 read(int fd, void *buffer, unsigned size){
 	int result;
 
-	if(fd == 0){
+	//check_pointer(buffer);
+	if(fd == STDIN_FILENO){
 		unsigned i = 0;
 
 		for(;i<size;i++)
@@ -336,21 +337,25 @@ int
 write(int fd, const void *buffer, unsigned size){
 	int result;
 
-	if(fd == 1){
+	//check_pointer(buffer);
+	if(fd == STDOUT_FILENO){
 		putbuf(buffer, size);
 		result = size;
 	}
 	else{
-		lock_acquire(&lock_filesys);
+		
 		struct file *file = get_file(fd);
 
 		if(!file){
 			result = 0;
 		}
 		else{
+			lock_acquire(&lock_filesys);
 			result = file_write(file, buffer, size);
+			lock_release(&lock_filesys);
 		}
-		lock_release(&lock_filesys);
+		//printf("syscall_handler - SYS_WRITE -result = %d\n", result);
+		
 	}
 
 	return result;
@@ -363,9 +368,9 @@ seek(int fd, unsigned position){
 	struct file * file = get_file(fd);
 
 	if(!file){
-		file_seek(file, position);
+		return -1;
 	}
-
+	file_seek(file, position);
 	lock_release(&lock_filesys);
 }
 
@@ -409,6 +414,7 @@ close(int fd){
 			lock_acquire(&lock_filesys);
 			file_close(file_descriptor->file);
 			lock_release(&lock_filesys);
+			//free(file_descriptor);
 			break;
 		}
 	}

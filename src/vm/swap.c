@@ -1,7 +1,10 @@
 #include <stdio.h>
 #include "vm/swap.h"
-#include "vm.frame.h"
-#include "vm.page.h"
+#include "vm/frame.h"
+#include "vm/page.h"
+#include "threads/palloc.h"
+#include "userprog/process.h"
+
 
 void
 swap_init(){
@@ -11,7 +14,7 @@ swap_init(){
 }
 
 void
-swap_out(void *kaddr){
+swap_add(void *kaddr){
 	int i;
 	int swap_table_index;
 
@@ -32,7 +35,7 @@ swap_out(void *kaddr){
 }
 
 void
-swap_in(void *kaddr, int swap_table_index){
+swap_delete(void *kaddr, int swap_table_index){
 	int i;
 
 	lock_acquire(&lock_swap);
@@ -47,8 +50,48 @@ swap_in(void *kaddr, int swap_table_index){
 }
 
 void
-swap_free(void *kaddr){
+swap_free(int swap_table_index){
 	lock_acquire(&lock_swap);
 	bitmap_set_multiple(swap_table, swap_table_index, DISK_SECTOR_NUMBER, false);
 	lock_release(&lock_swap);
+}
+
+bool
+swap_in(struct page_table_entry *pte, bool write){
+	
+	void *check_page;
+	struct frame *frame;
+	bool success = false;
+
+	if(pte->swap_table_index = -1){
+		return false;
+	}
+
+	check_page = palloc_get_page(PAL_USER);
+	if(check_page == NULL){
+		printf("you should make evict part\n");
+		return false;
+	}
+	else{
+		palloc_free_page(check_page);
+	}
+
+	frame = frame_alloc();
+	if(frame != NULL){
+
+		frame_add(frame);
+		frame_set_accessable(frame, true);
+
+		pte->frame = frame;
+		success = install_page(pte->vaddr, frame->addr, write);
+      	if(!success){
+      		page_table_delete(pte);
+      		return false;
+      	}
+
+      	swap_delete(frame->addr, pte->swap_table_index);
+		pte->swap_table_index = -1;
+	}
+
+	return true;
 }

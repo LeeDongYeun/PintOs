@@ -85,13 +85,13 @@ start_process (void *cmd_line)
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (cmd_line2, &if_.eip, &if_.esp);
-  //printf("load successed\n");
-  //printf("success = %d\n", success);
+  printf("load successed\n");
+  printf("success = %d\n", success);
   thread_current()-> load_status = success;
 
   sema_up(&thread_current()->sema_load);
 
-  //printf("start process = sema up\n");
+  printf("start process = sema up\n");
 
   palloc_free_page(cmd_line2);
   /* If load failed, quit. */
@@ -126,7 +126,7 @@ process_wait (tid_t child_tid UNUSED)
   struct thread *child_process;
   int status;
 
-  //printf("process_wait started\n");
+  printf("process_wait started\n");
   //printf("child_tid = %d\n", child_tid);
 
   child_process = get_child_thread(child_tid);
@@ -155,7 +155,7 @@ process_wait (tid_t child_tid UNUSED)
 void
 process_exit (void)
 {
-  //printf("process_exit started\n");
+  printf("process_exit started\n");
 
   struct thread *curr = thread_current ();
   uint32_t *pd;
@@ -298,16 +298,16 @@ load (const char *cmd_line, void (**eip) (void), void **esp)
 
   char *file_name;
 
-  //printf("load -> cmd_line = %s\n", cmd_line);
+  printf("load -> cmd_line = %s\n", cmd_line);
 
   char *argv = malloc(128);
   char *address = NULL;
 
   strlcpy(argv, cmd_line, 128);
-  //printf("load -> argv = %s\n", argv);
+  printf("load -> argv = %s\n", argv);
 
   file_name = strtok_r(argv, " ", &address);
-  //printf("load -> file_name = %s\n", file_name);
+  printf("load -> file_name = %s\n", file_name);
 
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create ();
@@ -315,6 +315,7 @@ load (const char *cmd_line, void (**eip) (void), void **esp)
     goto done;
   process_activate ();
 
+  printf("load befor file open\n");
   /* Open executable file. */
   file = filesys_open (file_name);
   if (file == NULL) 
@@ -322,6 +323,8 @@ load (const char *cmd_line, void (**eip) (void), void **esp)
       printf ("load: %s: open failed\n", file_name);
       goto done; 
     }
+
+  printf("load after file open\n");
 
   /* Read and verify executable header. */
   if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
@@ -396,7 +399,7 @@ load (const char *cmd_line, void (**eip) (void), void **esp)
           break;
         }
     }
-    
+  printf("load after file\n");
 
   t->file = file;
   file_deny_write(file);
@@ -539,8 +542,10 @@ setup_stack (void **esp)
 {
   void *upage = ((uint8_t *) PHYS_BASE) - PGSIZE;
   bool success = false;
+  printf("set stack\n");
 
 #ifdef VM
+  printf("setup stack\n");
   struct frame *frame;
   struct page_table_entry *pte;
 
@@ -566,6 +571,7 @@ setup_stack (void **esp)
   return success;
 
 #else
+  printf("no vm setup stack\n");
   uint8_t *kpage;
   kpage = palloc_get_page (PAL_USER | PAL_ZERO);
   if (kpage != NULL) 

@@ -11,6 +11,7 @@
 #ifdef VM
 #include "vm/page.h"
 #include "vm/frame.h"
+#include "vm/swap.h"
 #endif
 
 #define MAX_STACK_SIZE (1<<23)
@@ -164,7 +165,7 @@ page_fault (struct intr_frame *f)
   struct page_table_entry *pte;
   struct thread *curr = thread_current();
 
-  //printf("page faulted\n");
+  printf("page faulted\n");
 
   if(user){
     curr->esp = f->esp;
@@ -203,22 +204,10 @@ page_fault (struct intr_frame *f)
   }
 
   else{
-    //printf("frame alloc\n");
-    frame = frame_alloc();
-    if(frame != NULL){
+    success = swap_in(pte,write);
 
-      frame_add(frame);
-      frame_set_accessable(frame, true);
-
-      pte->frame = frame;   
-
-      success = install_page(pte->vaddr, frame->addr, write);
-      if(!success){
-        /*install_page 함수가 success가 안되면 페이지 테이블에서 제거하고 
-        프레임 테이블에서도 제거해준다*/
-        page_table_delete(pte);
-        exit(-1);
-      }
+    if(!success){
+      exit(-1);
     }
   }
 

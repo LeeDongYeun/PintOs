@@ -56,6 +56,7 @@ page_table_entry_alloc(void *uaddr, struct frame *frame){
 	}
 	pte->vaddr = uaddr;
 	pte->frame = frame;
+	pte->swap_table_index = -1;
 
 	return pte;
 }

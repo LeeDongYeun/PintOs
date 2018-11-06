@@ -8,6 +8,7 @@ struct page_table_entry{
 	void *vaddr;
 	struct frame *frame;
 	struct hash_elem elem;
+	int swap_table_index;
 };
 
 void page_table_init(struct hash *pt);

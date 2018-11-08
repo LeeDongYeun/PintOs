@@ -19,7 +19,7 @@ page_hash_less_func(const struct hash_elem *a,
 	struct page_table_entry *pte_a = hash_entry(a, struct page_table_entry, elem);
 	struct page_table_entry *pte_b = hash_entry(b, struct page_table_entry, elem);
 
-	if(pte_a->vaddr < pte_b)
+	if(pte_a->vaddr < pte_b->vaddr)
 		return true;
 	else 
 		return false;
@@ -114,10 +114,33 @@ page_table_find(void *uaddr){
 	struct hash_elem *e;
 
 	pte.vaddr = pg_round_down(uaddr);
-	e = hash_find(&thread_current()->page_table, &pte.vaddr);
+	e = hash_find(&thread_current()->page_table, &pte.elem);
 
 	if(e == NULL)
 		return NULL;
 
 	return hash_entry(e, struct page_table_entry, elem);
+}
+
+bool
+file_load(struct page_table_entry *pte){
+	struct frame *frame;
+	bool success = false;
+
+	frame = frame_alloc();
+	if(frame == NULL){
+		printf("you should make evict part\n");
+		return false;
+	}
+
+	else{
+		if (file_read_at(pte->file, frame->addr, pte->read_bytes, pte->offset) 
+			!= (int) pte->read_bytes){
+          frame_free(frame);
+          return false; 
+        }
+      memset(frame->addr + pte->read_bytes, 0, pte->zero_bytes);
+	}
+
+	return true;
 }

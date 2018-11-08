@@ -76,6 +76,7 @@ swap_in(struct page_table_entry *pte){
 
 		frame_add(frame);
 		frame_set_accessable(frame, true);
+		frame_set_uaddr(frame, pte->vaddr);
 
 		pte->frame = frame;
 		success = install_page(pte->vaddr, frame->addr, pte->writable);

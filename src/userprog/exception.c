@@ -207,8 +207,11 @@ page_fault (struct intr_frame *f)
   }
 
   else{
-    //printf("adfa\n");
-    success = swap_in(pte);
+    if(pte->type == PTE_SWAP)
+      success = swap_in(pte);
+    
+    else if(pte->type == PTE_FILE)
+        success = file_load(pte);
 
     if(!success){
       exit(-1);

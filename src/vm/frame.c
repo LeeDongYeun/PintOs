@@ -16,6 +16,10 @@ frame_alloc(){
 	lock_acquire(&lock_frame);
 
 	void *page = palloc_get_page(PAL_USER);
+	if(page == NULL){
+		printf("frame_alloc - palloc failed\n");
+		return NULL;
+	}
 	struct frame *f = malloc(sizeof(struct frame));
 
 	if(f== NULL){
@@ -37,6 +41,13 @@ frame_set_accessable(struct frame *frame, bool boolean){
 	lock_acquire(&lock_frame);
 	frame->accessable = boolean;
 	lock_release(&lock_frame);
+}
+
+void
+frame_set_uaddr(struct frame * frame, void *uaddr){
+  lock_acquire(&lock_frame);
+  frame->uaddr = uaddr;
+  lock_release(&lock_frame);
 }
 
 void

@@ -27,7 +27,7 @@ static bool load (const char *cmdline, void (**eip) (void), void **esp);
 bool install_page (void *upage, void *kpage, bool writable);
 int argument_count(char *parse);
 void argv_put_stack(char *parse,int count, void **esp);
-void stack_growth(void *addr);
+bool stack_growth(void *addr);
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
@@ -499,7 +499,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
   ASSERT (ofs % PGSIZE == 0);
 
   
-#ifdef VM
+#ifdef VMx
   struct frame *frame;
   struct page_table_entry *pte;
   
@@ -523,15 +523,19 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
           frame_free(frame);
           return false; 
         }
+      printf("frame->addr = %x page_read_bytes = %x\n",frame->addr, page_read_bytes);
+      printf("dst = %x size = %d\n", frame->addr + page_read_bytes, page_zero_bytes);
       memset(frame->addr + page_read_bytes, 0, page_zero_bytes);
+      
 
       frame_add(frame);
       frame_set_accessable(frame, true);
+      frame_set_uaddr(frame, upage);
 
       /*page table entry를 생성한 후 페이지 테이블에 넣어준다*/
       pte = page_table_entry_alloc(upage, frame, writable);
       page_table_add(pte);
-      //printf("page table added\n");
+      printf("page table added\n");
 
        /* Add the page to the process's address space. */
       if (!install_page (upage, frame->addr, writable)) 
@@ -544,13 +548,14 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       read_bytes -= page_read_bytes;
       zero_bytes -= page_zero_bytes;
       upage += PGSIZE;
-      ofs += PGSIZE;
+      ofs += page_read_bytes;
+      printf("read_bytes = %d zero_bytes = %d\n", read_bytes, zero_bytes);
     }
     printf("file to page done\n");
     return true;
 #endif
 
-#ifdef VMa
+#ifdef VMz
   struct page_table_entry *pte;
   
   file_seek (file, ofs);
@@ -572,7 +577,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       upage += PGSIZE;
       ofs += page_read_bytes;
     }
-    //printf("file to page done\n");
+    printf("file to page done\n");
     return true;
 
 #else
@@ -610,6 +615,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       zero_bytes -= page_zero_bytes;
       upage += PGSIZE;
     }
+    printf("file to page done\n");
   return true;
 
 #endif
@@ -641,6 +647,7 @@ setup_stack (void **esp)
 
     frame_add(frame);
     frame_set_accessable(frame, true);
+    frame_set_uaddr(frame, upage);
 
     /*page table entry를 생성한 후 페이지 테이블에 넣어준다*/
     pte = page_table_entry_alloc(upage, frame, true);
@@ -787,7 +794,7 @@ argv_put_stack(char *parse,int count, void **esp)
   //printf("argv_put_stack - esp = %p\n", *esp);
 }
 
-void
+bool
 stack_growth(void *addr){
   struct frame *frame;
   struct page_table_entry *pte;
@@ -808,6 +815,7 @@ stack_growth(void *addr){
 
     frame_add(frame);
     frame_set_accessable(frame, true);
+    frame_set_uaddr(frame, upage);
 
     /*page table entry를 생성한 후 페이지 테이블에 넣어준다*/
     pte = page_table_entry_alloc(upage, frame, true);
@@ -822,5 +830,13 @@ stack_growth(void *addr){
   }
   return success;
 
+}
+
+
+bool
+verify_stack (int32_t addr, int32_t esp)
+{
+  return is_user_vaddr (addr) && esp - addr <= 32
+      && 0xC0000000UL - addr <= 8 * 1024 * 1024;
 }
 

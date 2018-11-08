@@ -53,7 +53,7 @@ process_execute (const char *cmd_line)
   file_name = strtok_r(file_name, " ", &address);
 
   /* Create a new thread to execute FILE_NAME. */
-  //printf("%s %s\n",file_name,cmd_line);
+  printf("%s %s\n",file_name,cmd_line);
   tid = thread_create (file_name, PRI_DEFAULT, start_process, cmd_line2);
   
   if (tid == TID_ERROR)
@@ -63,7 +63,7 @@ process_execute (const char *cmd_line)
 
   palloc_free_page(file_name);
 
-  //printf("process_execute done\n");
+  printf("process_execute done\n");
 
   return tid;
 }
@@ -126,7 +126,7 @@ process_wait (tid_t child_tid UNUSED)
   struct thread *child_process;
   int status;
 
-  //printf("process_wait started\n");
+  printf("process_wait started\n");
   //printf("child_tid = %d\n", child_tid);
 
   child_process = get_child_thread(child_tid);
@@ -155,7 +155,7 @@ process_wait (tid_t child_tid UNUSED)
 void
 process_exit (void)
 {
-  //printf("process_exit started\n");
+  printf("process_exit started\n");
 
   struct thread *curr = thread_current ();
   uint32_t *pd;
@@ -546,7 +546,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       upage += PGSIZE;
       ofs += PGSIZE;
     }
-    //printf("file to page done\n");
+    printf("file to page done\n");
     return true;
 #endif
 
@@ -631,7 +631,13 @@ setup_stack (void **esp)
 
   /*프레임을 생성한 후 프레임 리스트에 추가한다*/
   frame = frame_alloc();
-  if(frame != NULL){
+
+  if(frame == NULL){
+    printf("you should make evict part\n");
+    return false;
+  }
+
+  else{
 
     frame_add(frame);
     frame_set_accessable(frame, true);
@@ -792,7 +798,13 @@ stack_growth(void *addr){
 
   /*프레임을 생성한 후 프레임 리스트에 추가한다*/
   frame = frame_alloc();
-  if(frame != NULL){
+
+  if(frame == NULL){
+    printf("you should make evict part\n");
+    return false;
+  }
+
+  else{
 
     frame_add(frame);
     frame_set_accessable(frame, true);

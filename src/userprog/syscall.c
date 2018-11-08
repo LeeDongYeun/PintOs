@@ -75,26 +75,27 @@ check_pointer(void *vaddr, void *esp){
 	printf("check_pointer\n");
 	struct page_table_entry *pte;
 	bool success = false;
+	
 	if (!is_user_vaddr(vaddr) || vaddr < 0x08048000){
       exit(-1);
     }
 
     pte = page_table_find(vaddr);
 
-  if(pte == NULL){
-    if(vaddr < esp - 32){
-      exit(-1);
-    }
+  	if(pte == NULL){
+    	if(vaddr < esp - 32){
+      		exit(-1);
+    	}
 
-    if(!(vaddr < PHYS_BASE && vaddr >= PHYS_BASE - MAX_STACK_SIZE)){
-      printf("fault2\n");
-      exit(-1);
-    }
+    	if(!(vaddr < PHYS_BASE && vaddr >= PHYS_BASE - MAX_STACK_SIZE)){
+      		printf("fault2\n");
+      		exit(-1);
+    	}
 
-    success = stack_growth(vaddr);
-    if(!success){
-      exit(-1);
-    }
+    	success = stack_growth(vaddr);
+    	if(!success){
+      		exit(-1);
+    	}
   }
 }
 
@@ -133,7 +134,7 @@ syscall_handler (struct intr_frame *f)
 	//printf("handler esp = %p", f->esp);
 	//printf("esp_val = %d\n", esp_val);
 	
-	//printf("syscall_handler started\n");
+	printf("syscall_handler started\n");
 
 	switch(esp_val){
 	  	case SYS_HALT:
@@ -230,7 +231,7 @@ halt(void){
 void
 exit(int status)
 {	
-	//printf("SYS_EXIT\n");
+	printf("SYS_EXIT\n");
 	struct thread *curr = thread_current ();
 	curr->exit_status = status;
 	printf("%s: exit(%d)\n", curr->name, status);
@@ -240,7 +241,7 @@ exit(int status)
 
 pid_t
 exec(const char *cmd_line){
-	//printf("SYS_EXEC\n");
+	printf("SYS_EXEC\n");
 	int tid;
 	struct thread *child_process;
 
@@ -263,13 +264,13 @@ exec(const char *cmd_line){
 int
 wait(pid_t pid)
 {	
-	//printf("SYS_WAIT\n");
+	printf("SYS_WAIT\n");
 	return process_wait(pid);
 }
 
 bool
 create(const char *file, unsigned initial_size){
-	//printf("SYS_CREATE\n");
+	printf("SYS_CREATE\n");
 	bool result;
 
 	if(file==NULL)
@@ -284,7 +285,7 @@ create(const char *file, unsigned initial_size){
 
 bool
 remove(const char *file){
-	//printf("SYS_REMOVE\n");
+	printf("SYS_REMOVE\n");
 	bool result;
 
 	//check_pointer(file);
@@ -301,7 +302,7 @@ file_descriptor라는 구조체를 저장한다. 그 후 fd를 증가시켜 준�
 */
 int
 open(const char *file){
-	//printf("SYS_OPEN\n");
+	printf("SYS_OPEN\n");
 	if(file ==NULL)
 		return -1;
 	int result;
@@ -337,7 +338,7 @@ open(const char *file){
 */
 int
 filesize(int fd){
-	//printf("SYS_FILESIZE\n");
+	printf("SYS_FILESIZE\n");
 	int result;
 
 	lock_acquire(&lock_filesys);
@@ -361,7 +362,7 @@ fd 의 값이 0 이면 키보드로부터 버퍼에 값을 읽어오고,
 */
 int
 read(int fd, void *buffer, unsigned size){
-	//printf("SYS_READ\n");
+	printf("SYS_READ\n");
 	int result;
 
 	//check_pointer(buffer);
@@ -393,7 +394,7 @@ read(int fd, void *buffer, unsigned size){
 
 int
 write(int fd, const void *buffer, unsigned size){
-	//printf("SYS_WRITE\n");
+	printf("SYS_WRITE\n");
 	int result;
 
 	//check_pointer(buffer);
@@ -422,7 +423,7 @@ write(int fd, const void *buffer, unsigned size){
 
 void
 seek(int fd, unsigned position){
-	//printf("SYS_SEEK\n");
+	printf("SYS_SEEK\n");
 	lock_acquire(&lock_filesys);
 	struct file * file = get_file(fd);
 
@@ -435,7 +436,7 @@ seek(int fd, unsigned position){
 
 unsigned
 tell(int fd){
-	//printf("SYS_TELL\n");
+	printf("SYS_TELL\n");
 	off_t result;
 
 	lock_acquire(&lock_filesys);
@@ -458,7 +459,7 @@ thread의 file_list에서 제거해주고, file 또한 닫는다.
 */
 void
 close(int fd){
-	//printf("SYS_CLOSE\n");
+	printf("SYS_CLOSE\n");
 	struct thread *curr = thread_current();
 	struct list_elem *e;
 	struct file_descriptor *file_descriptor;

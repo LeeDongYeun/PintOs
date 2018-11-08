@@ -171,7 +171,7 @@ page_fault (struct intr_frame *f)
     curr->esp = f->esp;
   }
 
-  //printf("page faulted. fault_addr = %p esp = %p tid = %d\n", fault_addr, curr->esp, curr->tid);
+  printf("page faulted. fault_addr = %p esp = %p tid = %d\n", fault_addr, curr->esp, curr->tid);
 
   /*읽기 전용 페이지에 쓰기를 시도할 경우*/
   if(!not_present){
@@ -188,7 +188,7 @@ page_fault (struct intr_frame *f)
   pte = page_table_find(fault_addr);
 
   if(pte == NULL){
-    //printf("you should make stack expand\n");
+    printf("you should make stack expand\n");
     if(fault_addr < curr->esp - 32){
       //printf("fault_addr = %x curr->esp - 32 = %x\n", fault_addr, curr->esp-32);
       //printf("fault1\n");

@@ -3,12 +3,15 @@
 
 #include <list.h>
 #include "threads/synch.h"
+#include "threads/thread.h"
 
 struct frame{
 	struct list_elem elem;
 	void *addr;
 	bool accessable;
 	void *uaddr;
+
+	struct thread *thread;
 };
 
 struct list frame_table;

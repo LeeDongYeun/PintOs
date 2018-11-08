@@ -53,7 +53,7 @@ process_execute (const char *cmd_line)
   file_name = strtok_r(file_name, " ", &address);
 
   /* Create a new thread to execute FILE_NAME. */
-  printf("%s %s\n",file_name,cmd_line);
+  //printf("%s %s\n",file_name,cmd_line);
   tid = thread_create (file_name, PRI_DEFAULT, start_process, cmd_line2);
   
   if (tid == TID_ERROR)
@@ -85,7 +85,7 @@ start_process (void *cmd_line)
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (cmd_line2, &if_.eip, &if_.esp);
-  //printf("load successed\n");
+  printf("load successed\n");
   //printf("success = %d\n", success);
   thread_current()-> load_status = success;
 
@@ -155,7 +155,7 @@ process_wait (tid_t child_tid UNUSED)
 void
 process_exit (void)
 {
-  printf("process_exit started\n");
+  //printf("process_exit started\n");
 
   struct thread *curr = thread_current ();
   uint32_t *pd;
@@ -298,7 +298,7 @@ load (const char *cmd_line, void (**eip) (void), void **esp)
 
   char *file_name;
 
-  //printf("load -> cmd_line = %s\n", cmd_line);
+  printf("load -> cmd_line = %s\n", cmd_line);
 
   char *argv = malloc(128);
   char *address = NULL;
@@ -315,7 +315,7 @@ load (const char *cmd_line, void (**eip) (void), void **esp)
     goto done;
   process_activate ();
 
-  //printf("load befor file open\n");
+  printf("load befor file open\n");
   /* Open executable file. */
   file = filesys_open (file_name);
   if (file == NULL) 
@@ -324,7 +324,7 @@ load (const char *cmd_line, void (**eip) (void), void **esp)
       goto done; 
     }
 
-  //printf("load after file open\n");
+  printf("load after file open\n");
 
   /* Read and verify executable header. */
   if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
@@ -342,6 +342,7 @@ load (const char *cmd_line, void (**eip) (void), void **esp)
     }
 
   /* Read program headers. */
+  printf("ehdr.e_phnum = %d\n", ehdr.e_phnum);
   file_ofs = ehdr.e_phoff;
   for (i = 0; i < ehdr.e_phnum; i++) 
     {
@@ -399,7 +400,7 @@ load (const char *cmd_line, void (**eip) (void), void **esp)
           break;
         }
     }
-  //("load after file\n");
+  ("load after file\n");
 
   t->file = file;
   file_deny_write(file);
@@ -499,7 +500,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
   ASSERT (ofs % PGSIZE == 0);
 
   
-#ifdef VMx
+#ifdef VMd
   struct frame *frame;
   struct page_table_entry *pte;
   
@@ -555,10 +556,11 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
     return true;
 #endif
 
-#ifdef VMz
+#ifdef VM
   struct page_table_entry *pte;
   
   file_seek (file, ofs);
+  printf("offset = %d\n", ofs);
   while (read_bytes > 0 || zero_bytes > 0) 
     {
       /* Do calculate how to fill this page.
@@ -569,13 +571,15 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 
       pte = page_table_entry_file(upage, file, ofs, page_read_bytes, page_zero_bytes, writable);
       page_table_add(pte);
-      //printf("page_table_added\n");
+      printf("offset = %d\n", ofs);
+      printf("current thread = %d\n", thread_current()->tid);
+
 
       /* Advance. */
       read_bytes -= page_read_bytes;
       zero_bytes -= page_zero_bytes;
       upage += PGSIZE;
-      ofs += page_read_bytes;
+      ofs += PGSIZE;
     }
     printf("file to page done\n");
     return true;
@@ -640,7 +644,6 @@ setup_stack (void **esp)
 
   if(frame == NULL){
     printf("you should make evict part\n");
-    return false;
   }
 
   else{
@@ -808,7 +811,6 @@ stack_growth(void *addr){
 
   if(frame == NULL){
     printf("you should make evict part\n");
-    return false;
   }
 
   else{
@@ -829,7 +831,6 @@ stack_growth(void *addr){
       page_table_delete(pte);
   }
   return success;
-
 }
 
 

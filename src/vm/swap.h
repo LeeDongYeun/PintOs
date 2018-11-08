@@ -14,7 +14,7 @@ struct disk *swap_disk;
 struct lock lock_swap;
 
 void swap_init(void);
-void swap_add(void *kaddr);
+int swap_add(void *kaddr);
 void swap_delete(void *kaddr, int swap_table_index);
 void swap_free(int swap_table_index);
 bool swap_in(struct page_table_entry *pte);

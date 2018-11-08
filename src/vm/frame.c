@@ -13,7 +13,7 @@ frame_table_init(){
 struct frame *
 frame_alloc(){
 
-	lock_acquire(&lock_frame);
+	//lock_acquire(&lock_frame);
 
 	void *page = palloc_get_page(PAL_USER);
 	if(page == NULL){
@@ -30,8 +30,10 @@ frame_alloc(){
 
 	f->addr = page;
 	f->accessable = false;
+	f->thread = thread_current();
 
-	lock_release(&lock_frame);
+	//lock_release(&lock_frame);
+	//printf("frame_alloced\n");
 
 	return f;
 }

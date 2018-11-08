@@ -30,7 +30,8 @@ page_hash_destroy_func(struct hash_elem *e, void *aux UNUSED){
 	ASSERT(e != NULL);
 
 	struct page_table_entry *pte = hash_entry(e, struct page_table_entry, elem);
-	frame_free(pte->frame);
+	if(pte->frame != NULL)
+		frame_free(pte->frame);
 	pagedir_clear_page(thread_current()->pagedir, pte->vaddr);
 	free(pte);
 }
@@ -89,6 +90,7 @@ page_table_add(struct page_table_entry *pte){
 	//ASSERT(thread_current()->page_table);
 	ASSERT(pte != NULL);
 
+	//printf("page_table_added\n");
 
 	hash_insert(&thread_current()->page_table, &pte->elem);
 }
@@ -98,7 +100,7 @@ page_table_delete(struct page_table_entry *pte){
 	//ASSERT(thread_current()->page_table != NULL);
 
 	hash_delete(&thread_current()->page_table, &pte->elem);
-	if(pte->type == PTE_SWAP){
+	if(pte->frame != NULL){
 		frame_free(pte->frame);
 	}
 	
@@ -125,22 +127,25 @@ page_table_find(void *uaddr){
 bool
 file_load(struct page_table_entry *pte){
 	struct frame *frame;
+	struct page_table_entry *victim_pte;
 	bool success = false;
 
 	frame = frame_alloc();
 	if(frame == NULL){
-		printf("you should make evict part\n");
-		return false;
+		printf("adsf\n");
+		frame = frame_replacement_select();
+		victim_pte = page_table_find(frame->uaddr);
+		victim_pte->swap_table_index = swap_add(frame->addr);
+		pagedir_clear_page(frame->thread->pagedir, frame->uaddr);
+		victim_pte->frame = NULL;
 	}
 
-	else{
-		if (file_read_at(pte->file, frame->addr, pte->read_bytes, pte->offset) 
-			!= (int) pte->read_bytes){
-          frame_free(frame);
-          return false; 
-        }
-      memset(frame->addr + pte->read_bytes, 0, pte->zero_bytes);
-	}
+	if (file_read_at(pte->file, frame->addr, pte->read_bytes, pte->offset) 
+		!= (int) pte->read_bytes){
+        frame_free(frame);
+        return false; 
+    }
+    memset(frame->addr + pte->read_bytes, 0, pte->zero_bytes);
 
 	return true;
 }

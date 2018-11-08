@@ -13,7 +13,7 @@ swap_init(){
 	lock_init(&lock_swap);
 }
 
-void
+int
 swap_add(void *kaddr){
 	int i;
 	int swap_table_index;
@@ -60,6 +60,7 @@ bool
 swap_in(struct page_table_entry *pte){
 	
 	struct frame *frame;
+	struct page_table_entry *victim_pte;
 	bool success = false;
 
 	if(pte->swap_table_index = -1){
@@ -67,27 +68,39 @@ swap_in(struct page_table_entry *pte){
 	}
 
 	frame = frame_alloc();
+
 	if(frame == NULL){
-		printf("you should make evict part\n");
-		return false;
+		printf("asdfdfsafdsa\n");
 	}
 
-	else{
+	frame_add(frame);
+	frame_set_accessable(frame, true);
+	frame_set_uaddr(frame, pte->vaddr);
 
-		frame_add(frame);
-		frame_set_accessable(frame, true);
-		frame_set_uaddr(frame, pte->vaddr);
+	pte->frame = frame;
+	success = install_page(pte->vaddr, frame->addr, pte->writable);
+      if(!success){
+      	page_table_delete(pte);
+      	return false;
+      }
+    swap_delete(frame->addr, pte->swap_table_index);
+	pte->swap_table_index = -1;
+	
+	return true;
+}
 
-		pte->frame = frame;
-		success = install_page(pte->vaddr, frame->addr, pte->writable);
-      	if(!success){
-      		page_table_delete(pte);
-      		return false;
-      	}
+bool
+swap_out(){
+	struct frame *victim_frame = frame_replacement_select();
+	if(victim_frame == NULL) printf("NULL FRAME\n");
+	printf("victim frame uaddr = %p\n", victim_frame->uaddr);
+	struct page_table_entry *victim_pte = page_table_find(victim_frame->uaddr);
+	if(victim_pte == NULL) printf("NULL PTE\n");
+	victim_pte->swap_table_index = swap_add(victim_frame->addr);
 
-      	swap_delete(frame->addr, pte->swap_table_index);
-		pte->swap_table_index = -1;
-	}
+	pagedir_clear_page(victim_frame->thread->pagedir, victim_frame->uaddr);
+	victim_pte->frame = NULL;
+	frame_free(victim_frame);
 
 	return true;
 }

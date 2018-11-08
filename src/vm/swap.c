@@ -57,9 +57,8 @@ swap_free(int swap_table_index){
 }
 
 bool
-swap_in(struct page_table_entry *pte, bool write){
+swap_in(struct page_table_entry *pte){
 	
-	void *check_page;
 	struct frame *frame;
 	bool success = false;
 
@@ -67,23 +66,19 @@ swap_in(struct page_table_entry *pte, bool write){
 		return false;
 	}
 
-	check_page = palloc_get_page(PAL_USER);
-	if(check_page == NULL){
+	frame = frame_alloc();
+	if(frame == NULL){
 		printf("you should make evict part\n");
 		return false;
 	}
-	else{
-		palloc_free_page(check_page);
-	}
 
-	frame = frame_alloc();
-	if(frame != NULL){
+	else{
 
 		frame_add(frame);
 		frame_set_accessable(frame, true);
 
 		pte->frame = frame;
-		success = install_page(pte->vaddr, frame->addr, write);
+		success = install_page(pte->vaddr, frame->addr, pte->writable);
       	if(!success){
       		page_table_delete(pte);
       		return false;

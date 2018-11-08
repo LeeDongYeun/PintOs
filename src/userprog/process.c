@@ -85,13 +85,13 @@ start_process (void *cmd_line)
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (cmd_line2, &if_.eip, &if_.esp);
-  printf("load successed\n");
-  printf("success = %d\n", success);
+  //printf("load successed\n");
+  //printf("success = %d\n", success);
   thread_current()-> load_status = success;
 
   sema_up(&thread_current()->sema_load);
 
-  printf("start process = sema up\n");
+  //printf("start process = sema up\n");
 
   palloc_free_page(cmd_line2);
   /* If load failed, quit. */
@@ -126,7 +126,7 @@ process_wait (tid_t child_tid UNUSED)
   struct thread *child_process;
   int status;
 
-  printf("process_wait started\n");
+  //printf("process_wait started\n");
   //printf("child_tid = %d\n", child_tid);
 
   child_process = get_child_thread(child_tid);
@@ -155,7 +155,7 @@ process_wait (tid_t child_tid UNUSED)
 void
 process_exit (void)
 {
-  printf("process_exit started\n");
+  //printf("process_exit started\n");
 
   struct thread *curr = thread_current ();
   uint32_t *pd;
@@ -298,16 +298,16 @@ load (const char *cmd_line, void (**eip) (void), void **esp)
 
   char *file_name;
 
-  printf("load -> cmd_line = %s\n", cmd_line);
+  //printf("load -> cmd_line = %s\n", cmd_line);
 
   char *argv = malloc(128);
   char *address = NULL;
 
   strlcpy(argv, cmd_line, 128);
-  printf("load -> argv = %s\n", argv);
+  //printf("load -> argv = %s\n", argv);
 
   file_name = strtok_r(argv, " ", &address);
-  printf("load -> file_name = %s\n", file_name);
+  //printf("load -> file_name = %s\n", file_name);
 
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create ();
@@ -315,7 +315,7 @@ load (const char *cmd_line, void (**eip) (void), void **esp)
     goto done;
   process_activate ();
 
-  printf("load befor file open\n");
+  //printf("load befor file open\n");
   /* Open executable file. */
   file = filesys_open (file_name);
   if (file == NULL) 
@@ -324,7 +324,7 @@ load (const char *cmd_line, void (**eip) (void), void **esp)
       goto done; 
     }
 
-  printf("load after file open\n");
+  //printf("load after file open\n");
 
   /* Read and verify executable header. */
   if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
@@ -399,7 +399,7 @@ load (const char *cmd_line, void (**eip) (void), void **esp)
           break;
         }
     }
-  printf("load after file\n");
+  //("load after file\n");
 
   t->file = file;
   file_deny_write(file);
@@ -499,6 +499,57 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
   ASSERT (ofs % PGSIZE == 0);
 
   
+#ifdef VM
+  struct frame *frame;
+  struct page_table_entry *pte;
+  
+  file_seek (file, ofs);
+  while (read_bytes > 0 || zero_bytes > 0) 
+    {
+      /* Do calculate how to fill this page.
+         We will read PAGE_READ_BYTES bytes from FILE
+         and zero the final PAGE_ZERO_BYTES bytes. */
+      size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
+      size_t page_zero_bytes = PGSIZE - page_read_bytes;
+
+      frame = frame_alloc();
+      if(frame == NULL){
+        printf("frame_alloc failed\n");
+        return false;
+      }
+
+      if (file_read (file, frame->addr, page_read_bytes) != (int) page_read_bytes)
+        {
+          frame_free(frame);
+          return false; 
+        }
+      memset(frame->addr + page_read_bytes, 0, page_zero_bytes);
+
+      frame_add(frame);
+      frame_set_accessable(frame, true);
+
+      /*page table entry를 생성한 후 페이지 테이블에 넣어준다*/
+      pte = page_table_entry_alloc(upage, frame, writable);
+      page_table_add(pte);
+      //printf("page table added\n");
+
+       /* Add the page to the process's address space. */
+      if (!install_page (upage, frame->addr, writable)) 
+        {
+          printf("install page failed\n");
+          page_table_delete(pte);
+          return false; 
+        }
+      /* Advance. */
+      read_bytes -= page_read_bytes;
+      zero_bytes -= page_zero_bytes;
+      upage += PGSIZE;
+      ofs += PGSIZE;
+    }
+    //printf("file to page done\n");
+    return true;
+#endif
+
 #ifdef VMa
   struct page_table_entry *pte;
   
@@ -511,16 +562,17 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
-      pte = page_table_entry_file(upage, file, ofs, page_read_bytes, page_zero_bytes);
+      pte = page_table_entry_file(upage, file, ofs, page_read_bytes, page_zero_bytes, writable);
       page_table_add(pte);
-      printf("page_table_added\n");
+      //printf("page_table_added\n");
 
       /* Advance. */
       read_bytes -= page_read_bytes;
       zero_bytes -= page_zero_bytes;
       upage += PGSIZE;
-      ofs += PGSIZE;
+      ofs += page_read_bytes;
     }
+    //printf("file to page done\n");
     return true;
 
 #else
@@ -570,10 +622,10 @@ setup_stack (void **esp)
 {
   void *upage = ((uint8_t *) PHYS_BASE) - PGSIZE;
   bool success = false;
-  printf("set stack\n");
+  //printf("set stack\n");
 
 #ifdef VM
-  printf("setup stack\n");
+  //printf("setup stack\n");
   struct frame *frame;
   struct page_table_entry *pte;
 
@@ -585,7 +637,7 @@ setup_stack (void **esp)
     frame_set_accessable(frame, true);
 
     /*page table entry를 생성한 후 페이지 테이블에 넣어준다*/
-    pte = page_table_entry_alloc(upage, frame);
+    pte = page_table_entry_alloc(upage, frame, true);
     page_table_add(pte);
 
     success = install_page(upage, frame->addr, true);
@@ -599,7 +651,7 @@ setup_stack (void **esp)
   return success;
 
 #else
-  printf("no vm setup stack\n");
+  //printf("no vm setup stack\n");
   uint8_t *kpage;
   kpage = palloc_get_page (PAL_USER | PAL_ZERO);
   if (kpage != NULL) 
@@ -746,7 +798,7 @@ stack_growth(void *addr){
     frame_set_accessable(frame, true);
 
     /*page table entry를 생성한 후 페이지 테이블에 넣어준다*/
-    pte = page_table_entry_alloc(upage, frame);
+    pte = page_table_entry_alloc(upage, frame, true);
     page_table_add(pte);
 
     success = install_page(upage, frame->addr, true);

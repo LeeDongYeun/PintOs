@@ -2,6 +2,7 @@
 #define VM_FRAME_H
 
 #include <list.h>
+#include "threads/synch.h"
 
 struct frame{
 	struct list_elem elem;
@@ -10,6 +11,8 @@ struct frame{
 };
 
 struct list frame_table;
+
+struct lock lock_frame;
 
 void frame_table_init();
 struct frame *frame_alloc();

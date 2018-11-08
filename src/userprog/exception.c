@@ -165,35 +165,38 @@ page_fault (struct intr_frame *f)
   struct page_table_entry *pte;
   struct thread *curr = thread_current();
 
-  printf("page faulted\n");
+  //printf("page faulted fault_addr = %p\n", f->esp);
 
   if(user){
     curr->esp = f->esp;
   }
 
+  //printf("page faulted. fault_addr = %p esp = %p tid = %d\n", fault_addr, curr->esp, curr->tid);
+
   /*읽기 전용 페이지에 쓰기를 시도할 경우*/
   if(!not_present){
-    printf("write to read only page\n");
+    //printf("write to read only page\n");
     exit(-1);
   }
 
   /*페이지가 커널 가상 메모리에 있는 경우*/
   if(is_kernel_vaddr(fault_addr)){
-    printf("is kernel vaddr\n ");
+    //printf("is kernel vaddr\n ");
     exit(-1);
   }
 
   pte = page_table_find(fault_addr);
 
   if(pte == NULL){
-    printf("you should make stack expand\n");
+    //printf("you should make stack expand\n");
     if(fault_addr < curr->esp - 32){
-      printf("fault1\n");
+      //printf("fault_addr = %x curr->esp - 32 = %x\n", fault_addr, curr->esp-32);
+      //printf("fault1\n");
       exit(-1);
     }
 
     if(!(fault_addr < PHYS_BASE && fault_addr >= PHYS_BASE - MAX_STACK_SIZE)){
-      printf("fault2\n");
+      //printf("fault2\n");
       exit(-1);
     }
 
@@ -204,8 +207,8 @@ page_fault (struct intr_frame *f)
   }
 
   else{
-    printf("adfa\n");
-    success = swap_in(pte,write);
+    //printf("adfa\n");
+    success = swap_in(pte);
 
     if(!success){
       exit(-1);

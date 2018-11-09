@@ -182,26 +182,18 @@ page_fault (struct intr_frame *f)
   }
 
   /*페이지가 커널 가상 메모리에 있는 경우*/
-  if(is_kernel_vaddr(fault_addr)){
+  if(is_kernel_vaddr(fault_addr) || fault_addr <0x08048000){
     //printf("is kernel vaddr\n ");
     exit(-1);
-  }
-
-  check_page = palloc_get_page(PAL_USER);
-  if(check_page == NULL){
-    //printf("there is no empty page\n");
-  }
-  else{
-    //printf("exists page\n");
-    palloc_free_page(check_page);
   }
 
   //printf("adsfa\n");
   pte = page_table_find(fault_addr);
   //printf("adfasd\n");
 
+
   if(pte == NULL){
-   printf("you should make stack expand\n");
+   //printf("you should make stack expand\n");
     if(fault_addr < curr->esp - 32){
       //printf("fault_addr = %x curr->esp - 32 = %x\n", fault_addr, curr->esp-32);
       //printf("fault1\n");
@@ -220,6 +212,7 @@ page_fault (struct intr_frame *f)
   }
 
   else{
+    //printf("swap needed\n");
     if(pte->type == PTE_SWAP)
       success = swap_in(pte);
 
@@ -233,22 +226,20 @@ page_fault (struct intr_frame *f)
         frame_free(frame);
         return false; 
       }
-      printf("pte->offset = %d\n", pte->offset);
-      printf("current thread = %d\n", thread_current()->tid);
+      //printf("pte->offset = %d\n", pte->offset);
+      //printf("current thread = %d\n", thread_current()->tid);
 
       memset(frame->addr + pte->read_bytes, 0, pte->zero_bytes);
-
-      frame_add(frame);
-      frame_set_accessable(frame, true);
-      frame_set_uaddr(frame, pte->vaddr);
-
-      pte->frame = frame;
 
       if (!install_page (pte->vaddr, frame->addr, pte->writable)) {
           printf("adf\n");
           free(frame);
           return false; 
         }
+
+      frame_add(frame);
+      frame_set_accessable(frame, true);
+      frame_set_uaddr(frame, pte->vaddr);
       //pte->type = PTE_SWAP;
       printf("file read\n");
       success = true;

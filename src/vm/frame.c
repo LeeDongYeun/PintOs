@@ -17,7 +17,7 @@ frame_alloc(){
 
 	void *page = palloc_get_page(PAL_USER);
 	if(page == NULL){
-		printf("frame_alloc - palloc failed\n");
+		//printf("frame_alloc - palloc failed\n");
 		return NULL;
 	}
 	struct frame *f = malloc(sizeof(struct frame));

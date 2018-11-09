@@ -2,6 +2,7 @@
 #include "vm/frame.h"
 #include "threads/palloc.h"
 #include "threads/malloc.h"
+#include "threads/vaddr.h"
 
 
 void
@@ -32,6 +33,8 @@ frame_alloc(){
 	f->accessable = false;
 	f->thread = thread_current();
 
+	//printf("frame_alloc - &thread_current()->tid = %d\n", &thread_current()->tid);
+
 	//lock_release(&lock_frame);
 	//printf("frame_alloced\n");
 
@@ -48,7 +51,7 @@ frame_set_accessable(struct frame *frame, bool boolean){
 void
 frame_set_uaddr(struct frame * frame, void *uaddr){
   lock_acquire(&lock_frame);
-  frame->uaddr = uaddr;
+  frame->uaddr = pg_round_down(uaddr);
   lock_release(&lock_frame);
 }
 

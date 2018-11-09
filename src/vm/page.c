@@ -4,6 +4,7 @@
 #include "threads/thread.h"
 #include "threads/malloc.h"
 #include "threads/vaddr.h"
+#include "vm/swap.h"
 
 
 static unsigned
@@ -97,11 +98,16 @@ page_table_add(struct page_table_entry *pte){
 
 void
 page_table_delete(struct page_table_entry *pte){
+	printf("page_table_delete - pte->vaddr = %p\n", pte->vaddr);
 	//ASSERT(thread_current()->page_table != NULL);
 
 	hash_delete(&thread_current()->page_table, &pte->elem);
 	if(pte->frame != NULL){
 		frame_free(pte->frame);
+	}
+
+	if(pte->swap_table_index != -1){
+		swap_free(pte->swap_table_index);
 	}
 	
 	pagedir_clear_page(thread_current()->pagedir, pte->vaddr);
@@ -109,14 +115,15 @@ page_table_delete(struct page_table_entry *pte){
 }
 
 struct page_table_entry *
-page_table_find(void *uaddr){
+page_table_find(void *uaddr, struct thread *t){
 	//ASSERT(&thread_current()->page_table != NULL);
 
 	struct page_table_entry pte;
 	struct hash_elem *e;
 
 	pte.vaddr = pg_round_down(uaddr);
-	e = hash_find(&thread_current()->page_table, &pte.elem);
+	e = hash_find(&t->page_table, &pte.elem);
+	//printf("page_table_find - &thread_current()->tid = %d\n", &thread_current()->tid);
 
 	if(e == NULL)
 		return NULL;
@@ -134,7 +141,7 @@ file_load(struct page_table_entry *pte){
 	if(frame == NULL){
 		printf("adsf\n");
 		frame = frame_replacement_select();
-		victim_pte = page_table_find(frame->uaddr);
+		victim_pte = page_table_find(frame->uaddr, frame->thread);
 		victim_pte->swap_table_index = swap_add(frame->addr);
 		pagedir_clear_page(frame->thread->pagedir, frame->uaddr);
 		victim_pte->frame = NULL;

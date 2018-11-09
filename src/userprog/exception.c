@@ -188,7 +188,7 @@ page_fault (struct intr_frame *f)
   }
 
   //printf("adsfa\n");
-  pte = page_table_find(fault_addr);
+  pte = page_table_find(fault_addr, curr);
   //printf("adfasd\n");
 
 

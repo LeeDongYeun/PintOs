@@ -69,7 +69,7 @@ int get_argv(char *ptr)
 		return temp1 + (temp2 << 8) + (temp3 << 16) + (temp4 << 24);
 	}
 }
-
+/*
 void
 check_pointer(void *vaddr, void *esp){
 	printf("check_pointer\n");
@@ -108,7 +108,7 @@ void
 check_buffer(const char *buff, unsigned size, void *esp){
 	while (size--)
     check_pointer((void *) (buff++), esp); 
-}
+}*/
 
 
 

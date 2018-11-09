@@ -114,7 +114,7 @@ swap_out(){
 
 	//printf("victim frame uaddr = %p\n", victim_frame->uaddr);
 
-	victim_pte = page_table_find(victim_frame->uaddr);
+	victim_pte = page_table_find(victim_frame->uaddr, victim_frame->thread);
 	if(victim_pte == NULL){
 		printf("NULL PTE\n");
 		return false;

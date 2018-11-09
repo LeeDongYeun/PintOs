@@ -549,48 +549,12 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
           return false; 
         }
 
-    if(pte->frame == NULL){
-      if(pte->swap_table_index == -1){
-        printf("load_segment - error pte\n");
-        exit(-1);
-      }
-    }
-
       /* Advance. */
       read_bytes -= page_read_bytes;
       zero_bytes -= page_zero_bytes;
       upage += PGSIZE;
       ofs += page_read_bytes;
       //printf("read_bytes = %d zero_bytes = %d\n", read_bytes, zero_bytes);
-    }
-    //printf("file to page done\n");
-    return true;
-#endif
-
-#ifdef VMz
-  struct page_table_entry *pte;
-  
-  file_seek (file, ofs);
-  printf("offset = %d\n", ofs);
-  while (read_bytes > 0 || zero_bytes > 0) 
-    {
-      /* Do calculate how to fill this page.
-         We will read PAGE_READ_BYTES bytes from FILE
-         and zero the final PAGE_ZERO_BYTES bytes. */
-      size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
-      size_t page_zero_bytes = PGSIZE - page_read_bytes;
-
-      pte = page_table_entry_file(upage, file, ofs, page_read_bytes, page_zero_bytes, writable);
-      page_table_add(pte);
-      printf("offset = %d\n", ofs);
-      printf("current thread = %d\n", thread_current()->tid);
-
-
-      /* Advance. */
-      read_bytes -= page_read_bytes;
-      zero_bytes -= page_zero_bytes;
-      upage += PGSIZE;
-      ofs += PGSIZE;
     }
     printf("file to page done\n");
     return true;
@@ -871,12 +835,3 @@ stack_growth(void *addr){
 
   return success;
 }
-
-
-bool
-verify_stack (int32_t addr, int32_t esp)
-{
-  return is_user_vaddr (addr) && esp - addr <= 32
-      && 0xC0000000UL - addr <= 8 * 1024 * 1024;
-}
-

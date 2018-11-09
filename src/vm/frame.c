@@ -106,6 +106,11 @@ frame_replacement_select(){
 		if(f->accessable = true)
 			lock_release(&lock_frame);
 			return f;
-		e = list_next(e);
+		if(e == list_end(&frame_table)){
+			e = list_begin(&frame_table);
+		}
+		else{
+			e = list_next(e);
+		}	
 	}
 }

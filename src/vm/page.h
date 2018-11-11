@@ -16,7 +16,7 @@ struct page_table_entry{
 	int swap_table_index;
 	bool writable;
 	
-	struct file *file;
+	char *filename;
 	int offset;
 	int read_bytes;
 	int zero_bytes;
@@ -32,5 +32,5 @@ struct page_table_entry *page_table_entry_alloc(void *uaddr, struct frame *frame
 void page_table_add(struct page_table_entry *pte);
 void page_table_delete(struct page_table_entry *pte);
 struct page_table_entry *page_table_find(void *uaddr, struct thread *t);
-bool file_load(struct page_table_entry *pte);
+//bool file_load(struct page_table_entry *pte);
 #endif

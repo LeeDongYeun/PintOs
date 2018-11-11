@@ -83,9 +83,10 @@ swap_in(struct page_table_entry *pte){
   	swap_delete(frame->addr, pte->swap_table_index);
 	pte->swap_table_index = -1;
 
-	frame_add(frame);
+	
 	frame_set_accessable(frame, true);
 	frame_set_uaddr(frame, pte->vaddr);
+	frame_add(frame);
 
 	pte->frame = frame;
 	success = install_page(pte->vaddr, frame->addr, pte->writable);
@@ -103,16 +104,16 @@ swap_out(){
 	struct frame *victim_frame;
 	struct page_table_entry *victim_pte;
 	int swap_table_index;
-	void *check_page;
 
 	victim_frame = frame_replacement_select();
+
+	//if(victim_frame->filename)
+	//	printf("swap_out victim_frame filename = %d\n", victim_frame->filename);
 
 	if(victim_frame == NULL){
 		printf("NULL FRAME\n");
 		return false;
 	} 
-
-	//printf("victim frame uaddr = %p\n", victim_frame->uaddr);
 
 	victim_pte = page_table_find(victim_frame->uaddr, victim_frame->thread);
 	if(victim_pte == NULL){
@@ -134,24 +135,10 @@ swap_out(){
 
 	pagedir_clear_page(victim_frame->thread->pagedir, victim_frame->uaddr);
 
+	if(victim_frame->filename != NULL)
+		printf("swap_out victim_frame filename = %s\n", victim_frame->filename);
+
 	frame_free(victim_frame);
-
-	check_page = palloc_get_page(PAL_USER);
-	if(check_page == NULL){
-		//printf("swap_out - palloc_get_page failed\n");
-		return false;
-	}
-	else{
-		//printf("swap_out - success\n");
-		palloc_free_page(check_page);
-	}
-
-	if(victim_pte->frame == NULL){
-    	if(victim_pte->swap_table_index == -1){
-      		printf("swap_out - error pte\n");
-      		exit(-1);
-    	}
-  	}
 
 	return true;
 }

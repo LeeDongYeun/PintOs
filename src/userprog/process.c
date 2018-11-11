@@ -278,7 +278,7 @@ struct Elf32_Phdr
 
 static bool setup_stack (void **esp);
 static bool validate_segment (const struct Elf32_Phdr *, struct file *);
-static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
+static bool load_segment (char *filename, struct file *file, off_t ofs, uint8_t *upage,
                           uint32_t read_bytes, uint32_t zero_bytes,
                           bool writable);
 
@@ -315,7 +315,8 @@ load (const char *cmd_line, void (**eip) (void), void **esp)
     goto done;
   process_activate ();
 
-  //printf("load befor file open\n");
+  //printf("pagdir created tid = %d\n", t->tid);
+
   /* Open executable file. */
   file = filesys_open (file_name);
   if (file == NULL) 
@@ -391,7 +392,7 @@ load (const char *cmd_line, void (**eip) (void), void **esp)
                   read_bytes = 0;
                   zero_bytes = ROUND_UP (page_offset + phdr.p_memsz, PGSIZE);
                 }
-              if (!load_segment (file, file_page, (void *) mem_page,
+              if (!load_segment (file_name, file, file_page, (void *) mem_page,
                                  read_bytes, zero_bytes, writable))
                 goto done;
             }
@@ -491,7 +492,7 @@ validate_segment (const struct Elf32_Phdr *phdr, struct file *file)
    Return true if successful, false if a memory allocation error
    or disk read error occurs. */
 static bool
-load_segment (struct file *file, off_t ofs, uint8_t *upage,
+load_segment (char *filename, struct file *file, off_t ofs, uint8_t *upage,
               uint32_t read_bytes, uint32_t zero_bytes, bool writable) 
 {
   ASSERT ((read_bytes + zero_bytes) % PGSIZE == 0);
@@ -512,6 +513,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
+      //printf("filename = %s\n", filename);
       frame = frame_alloc();
       if(frame == NULL){
         //printf("load_segment - frame_alloc failed\n");
@@ -532,12 +534,15 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       //printf("dst = %x size = %d\n", frame->addr + page_read_bytes, page_zero_bytes);
       memset(frame->addr + page_read_bytes, 0, page_zero_bytes);
       
-      frame_add(frame);
+      frame->type = FRAME_FILE;
+      
       frame_set_accessable(frame, true);
       frame_set_uaddr(frame, upage);
+      frame_add(frame);
 
       /*page table entry를 생성한 후 페이지 테이블에 넣어준다*/
       pte = page_table_entry_alloc(upage, frame, writable);
+      pte->filename = filename;
       page_table_add(pte);
       //printf("page table added\n");
 
@@ -553,10 +558,9 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       read_bytes -= page_read_bytes;
       zero_bytes -= page_zero_bytes;
       upage += PGSIZE;
-      ofs += page_read_bytes;
       //printf("read_bytes = %d zero_bytes = %d\n", read_bytes, zero_bytes);
     }
-    printf("file to page done\n");
+    //printf("file to page done\n");
     return true;
 
 #else
@@ -629,9 +633,9 @@ setup_stack (void **esp)
 
   //printf("setup_stack - frame_alloced\n");
 
-  frame_add(frame);
   frame_set_accessable(frame, true);
   frame_set_uaddr(frame, upage);
+  frame_add(frame);
 
   //printf("setup_stack - frame_set\n");
 
@@ -811,9 +815,10 @@ stack_growth(void *addr){
     }
   }
 
-  frame_add(frame);
+  
   frame_set_accessable(frame, true);
   frame_set_uaddr(frame, upage);
+  frame_add(frame);
 
   /*page table entry를 생성한 후 페이지 테이블에 넣어준다*/
   pte = page_table_entry_alloc(upage, frame, true);

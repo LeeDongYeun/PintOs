@@ -215,7 +215,7 @@ page_fault (struct intr_frame *f)
     //printf("swap needed\n");
     if(pte->type == PTE_SWAP)
       success = swap_in(pte);
-
+    /*
     else if(pte->type == PTE_FILE){
       //printf("PTE_FILE\n");
       frame = frame_alloc();
@@ -243,7 +243,7 @@ page_fault (struct intr_frame *f)
       //pte->type = PTE_SWAP;
       printf("file read\n");
       success = true;
-  }
+      }*/
 
     if(!success){
       exit(-1);

@@ -64,7 +64,7 @@ page_table_entry_alloc(void *uaddr, struct frame *frame, bool writable){
 
 	return pte;
 }
-
+/*
 struct page_table_entry *
 page_table_entry_file(void *uaddr, struct file *file, int offset, 
 						int read_bytes, int zero_bytes, bool writable){
@@ -84,7 +84,7 @@ page_table_entry_file(void *uaddr, struct file *file, int offset,
 	pte->zero_bytes = zero_bytes;
 
 	return pte;
-}
+}*/
 
 void
 page_table_add(struct page_table_entry *pte){
@@ -131,6 +131,7 @@ page_table_find(void *uaddr, struct thread *t){
 	return hash_entry(e, struct page_table_entry, elem);
 }
 
+/*
 bool
 file_load(struct page_table_entry *pte){
 	struct frame *frame;
@@ -155,4 +156,4 @@ file_load(struct page_table_entry *pte){
     memset(frame->addr + pte->read_bytes, 0, pte->zero_bytes);
 
 	return true;
-}
+}*/

@@ -5,11 +5,18 @@
 #include "threads/synch.h"
 #include "threads/thread.h"
 
+enum frame_type{
+	FRAME_STACK,
+	FRAME_FILE,
+};
+
 struct frame{
+	enum frame_type type;
 	struct list_elem elem;
 	void *addr;
 	bool accessable;
 	void *uaddr;
+	char *filename;
 
 	struct thread *thread;
 };
@@ -26,5 +33,7 @@ void frame_add(struct frame *frame);
 void frame_free(struct frame *frame);
 struct frame *frame_find(void *addr);
 struct frame *frame_replacement_select();
-
+struct frame *frame_replacement_select_current();
+struct frame *frame_replacement_select_not_current();
+struct frame *frame_replacement_select2();
 #endif 

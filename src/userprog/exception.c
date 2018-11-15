@@ -22,6 +22,7 @@ static long long page_fault_cnt;
 
 static void kill (struct intr_frame *);
 static void page_fault (struct intr_frame *);
+bool page_fault_process(void *fault_addr);
 
 /* Registers handlers for interrupts that can be caused by user
    programs.
@@ -162,13 +163,8 @@ page_fault (struct intr_frame *f)
   
 #ifdef VM
   bool success = false;
-  struct frame *frame;
-  struct page_table_entry *pte;
   struct thread *curr = thread_current();
-  void *check_page;
-
-  //printf("page faulted fault_addr = %p\n", f->esp);
-
+ 
   if(user){
     curr->esp = f->esp;
   }
@@ -187,73 +183,9 @@ page_fault (struct intr_frame *f)
     exit(-1);
   }
 
-  //printf("adsfa\n");
-  pte = page_table_find(fault_addr, curr);
-  //printf("adfasd\n");
-
-
-  if(pte == NULL){
-   //printf("you should make stack expand\n");
-    if(fault_addr < curr->esp - 32){
-      //printf("fault_addr = %x curr->esp - 32 = %x\n", fault_addr, curr->esp-32);
-      //printf("fault1\n");
-      exit(-1);
-    }
-
-    if(!(fault_addr < PHYS_BASE && fault_addr >= PHYS_BASE - MAX_STACK_SIZE)){
-      //printf("fault2\n");
-      exit(-1);
-    }
-
-    success = stack_growth(fault_addr);
-    if(!success){
-      exit(-1);
-    }
-  }
-
-  else{
-    //printf("swap needed\n");
-    if(pte->type == PTE_FRAME)
-      success = swap_in(pte);
-    
-    else if(pte->type == PTE_FILE){
-
-      frame = frame_alloc();
-
-      if(frame == NULL){
-        if(swap_out()){
-          frame = frame_alloc();
-        }
-        else{
-          return false;
-        }
-      }
-
-      if (file_read_at(pte->file, frame->kaddr, pte->read_bytes, pte->offset) 
-          != (int) pte->read_bytes){
-        printf("file didn't read\n");
-        frame_free(frame);
-        return false; 
-      }
-
-      memset(frame->kaddr + pte->read_bytes, 0, pte->zero_bytes);
-
-      if (!install_page (pte->vaddr, frame->kaddr, pte->writable)) {
-          free(frame);
-          return false; 
-        }
-
-      frame_to_table(frame, pte->vaddr);
-      success = true;
-
-      printf("page_fault - file read to frame\n");
-      }
-
-    if(!success){
-      exit(-1);
-    }
-  }
-
+  success = page_fault_process(fault_addr);
+  if(!success)
+    exit(-1);
 
 #else
   f->eip = f->eax;
@@ -271,15 +203,17 @@ page_fault (struct intr_frame *f)
   // kill (f);
 #endif
 }
-/*
-bool page_fault_process(void *fault_addr){
-  struct thread *curr = thread_current();
 
+bool 
+page_fault_process(void *fault_addr){
+  bool success = false;
   struct frame *frame;
   struct page_table_entry *pte;
+  struct thread *curr = thread_current();
+  void *check_page;
+
     pte = page_table_find(fault_addr, curr);
   //printf("adfasd\n");
-
 
   if(pte == NULL){
    //printf("you should make stack expand\n");
@@ -343,4 +277,5 @@ bool page_fault_process(void *fault_addr){
     }
   }
 
-}*/
+  return success;
+}

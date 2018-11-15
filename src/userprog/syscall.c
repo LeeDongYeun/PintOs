@@ -13,6 +13,7 @@
 #include "lib/kernel/list.h"
 #include "devices/input.h"
 #include "vm/page.h"
+#include "vm/frame.h"
 #include "userprog/exception.h"
 #include "threads/vaddr.h"
 #include "userprog/process.h"
@@ -69,6 +70,22 @@ int get_argv(char *ptr)
 		return temp1 + (temp2 << 8) + (temp3 << 16) + (temp4 << 24);
 	}
 }
+
+void set_accessable(void *vaddr, bool boolean){
+	printf("set_accessable\n");
+	struct page_table_entry *pte = page_table_find(vaddr, thread_current());
+	if(pte ==NULL){
+		stack_growth(vaddr);
+	}
+	frame_set_accessable(pte->frame, boolean);
+	printf("set_accessable done\n");
+}
+
+void set_accessable_buff(char *start, char *end, bool boolean){
+	for(; start < end; start += PGSIZE)
+			set_accessable(start, boolean);
+}
+
 /*
 void
 check_pointer(void *vaddr, void *esp){
@@ -364,8 +381,9 @@ int
 read(int fd, void *buffer, unsigned size){
 	//printf("SYS_READ\n");
 	int result;
-
-	//check_pointer(buffer);
+	
+	//set_accessable_buff(buffer, buffer + size, false);
+	
 	if(fd == STDIN_FILENO){
 		unsigned i = 0;
 
@@ -388,16 +406,18 @@ read(int fd, void *buffer, unsigned size){
 		lock_release(&lock_filesys);
 	}
 
+	//set_accessable_buff(buffer, buffer + size, true);
 	return result;
 }
 
 
 int
 write(int fd, const void *buffer, unsigned size){
-	//printf("SYS_WRITE\n");
+	
 	int result;
 
-	//check_pointer(buffer);
+	//set_accessable_buff(buffer, buffer + size, false);
+	
 	if(fd == STDOUT_FILENO){
 		putbuf(buffer, size);
 		result = size;
@@ -417,6 +437,7 @@ write(int fd, const void *buffer, unsigned size){
 		//printf("syscall_handler - SYS_WRITE -result = %d\n", result);
 		
 	}
+	//set_accessable_buff(buffer, buffer + size, true);
 
 	return result;
 }

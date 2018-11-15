@@ -17,8 +17,8 @@ frame_alloc(){
 
 	//lock_acquire(&lock_frame);
 
-	void *page = palloc_get_page(PAL_USER);
-	if(page == NULL){
+	void *kpage = palloc_get_page(PAL_USER);
+	if(kpage == NULL){
 		//printf("frame_alloc - palloc failed\n");
 		return NULL;
 	}
@@ -26,15 +26,13 @@ frame_alloc(){
 
 	if(f== NULL){
 		printf("frame_alloc - malloc failed\n");
-		palloc_free_page(page);
+		palloc_free_page(kpage);
 		return NULL;
 	}
 
-	f->type = FRAME_STACK;
-	f->addr = page;
-	f->accessable = false;
+	f->kaddr = kpage;
+	//f->accessable = false;
 	f->thread = thread_current();
-	f->filename = 0;
 
 	//printf("frame_alloc - &thread_current()->tid = %d\n", &thread_current()->tid);
 
@@ -46,22 +44,25 @@ frame_alloc(){
 
 void
 frame_set_accessable(struct frame *frame, bool boolean){
-	lock_acquire(&lock_frame);
 	frame->accessable = boolean;
-	lock_release(&lock_frame);
 }
 
 void
-frame_set_uaddr(struct frame * frame, void *uaddr){
-  lock_acquire(&lock_frame);
-  frame->uaddr = pg_round_down(uaddr);
-  lock_release(&lock_frame);
+frame_set_vaddr(struct frame * frame, void *vaddr){
+  frame->vaddr = pg_round_down(vaddr);
 }
 
 void
 frame_add(struct frame *frame){
-	lock_acquire(&lock_frame);
 	list_push_back(&frame_table, &frame->elem);
+}
+
+void
+frame_to_table(struct frame *frame, void *vaddr){
+	lock_acquire(&lock_frame);
+	frame_set_accessable(frame, true);
+	frame_set_vaddr(frame, vaddr);
+	frame_add(frame);
 	lock_release(&lock_frame);
 }
 
@@ -69,13 +70,13 @@ void
 frame_free(struct frame *frame){
 	lock_acquire(&lock_frame);
 	list_remove(&frame->elem);
-	palloc_free_page(frame->addr);
+	palloc_free_page(frame->kaddr);
 	free(frame);
 	lock_release(&lock_frame);
 }
 
 struct frame *
-frame_find(void *addr){
+frame_find(void *kaddr){
 	ASSERT(!list_empty(&frame_table));
 
 	lock_acquire(&lock_frame);
@@ -85,7 +86,7 @@ frame_find(void *addr){
 
 	for(e=list_begin(&frame_table); e!=list_end(&frame_table); e=list_next(e)){
 		f = list_entry(e, struct frame, elem);
-		if(f->addr == addr){
+		if(f->kaddr == kaddr){
 			lock_release(&lock_frame);
 			return f;
 		}
@@ -112,13 +113,13 @@ frame_replacement_select(){
 		
 		if(f->thread->pagedir != NULL){
 			//printf("access bit = %d dirty bit %d\n", 
-			//			pagedir_is_accessed(f->thread->pagedir, f->uaddr), 
-			//			pagedir_is_dirty(f->thread->pagedir, f->uaddr));
+			//			pagedir_is_accessed(f->thread->pagedir, f->vaddr), 
+			//			pagedir_is_dirty(f->thread->pagedir, f->vaddr));
 
 
-			if(pagedir_is_accessed(f->thread->pagedir, f->uaddr)){
+			if(pagedir_is_accessed(f->thread->pagedir, f->vaddr)){
 
-				pagedir_set_accessed(f->thread->pagedir, f->uaddr, false);
+				pagedir_set_accessed(f->thread->pagedir, f->vaddr, false);
 			}
 			else if(f->accessable == true)
 				//lock_release(&lock_frame);
@@ -144,11 +145,11 @@ frame_replacement_select_not_current(){
     	//printf("f->thread->tid = %d ", f->thread->tid);
 
     	if(f->thread->pagedir != NULL){
-    		if(pagedir_is_accessed(f->thread->pagedir, f->uaddr)){
+    		if(pagedir_is_accessed(f->thread->pagedir, f->vaddr)){
 
-				pagedir_set_accessed(f->thread->pagedir, f->uaddr, false);
+				pagedir_set_accessed(f->thread->pagedir, f->vaddr, false);
 			}
-			else if(f->accessable == true && f->type == FRAME_STACK)
+			else if(f->accessable == true)
 				//lock_release(&lock_frame);
 				return f;
 		}
@@ -167,9 +168,9 @@ frame_replacement_select_current(){
     	//printf("f->thread->tid = %d ", f->thread->tid);
 
     	if(f->thread->pagedir != NULL){
-    		if(pagedir_is_accessed(f->thread->pagedir, f->uaddr)){
+    		if(pagedir_is_accessed(f->thread->pagedir, f->vaddr)){
 
-				pagedir_set_accessed(f->thread->pagedir, f->uaddr, false);
+				pagedir_set_accessed(f->thread->pagedir, f->vaddr, false);
 			}
 			else if(f->accessable == true)
 				//lock_release(&lock_frame);

@@ -27,7 +27,7 @@ static bool load (const char *cmdline, void (**eip) (void), void **esp);
 bool install_page (void *upage, void *kpage, bool writable);
 int argument_count(char *parse);
 void argv_put_stack(char *parse,int count, void **esp);
-bool stack_growth(void *addr);
+bool stack_growth(void *vaddr);
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
@@ -525,29 +525,24 @@ load_segment (char *filename, struct file *file, off_t ofs, uint8_t *upage,
         }
       }
 
-      if (file_read (file, frame->addr, page_read_bytes) != (int) page_read_bytes)
+      if (file_read (file, frame->kaddr, page_read_bytes) != (int) page_read_bytes)
         {
           frame_free(frame);
           return false; 
         }
       //printf("frame->addr = %x page_read_bytes = %x\n",frame->addr, page_read_bytes);
       //printf("dst = %x size = %d\n", frame->addr + page_read_bytes, page_zero_bytes);
-      memset(frame->addr + page_read_bytes, 0, page_zero_bytes);
+      memset(frame->kaddr + page_read_bytes, 0, page_zero_bytes);
       
-      frame->type = FRAME_FILE;
-      
-      frame_set_accessable(frame, true);
-      frame_set_uaddr(frame, upage);
-      frame_add(frame);
+      frame_to_table(frame, upage);
 
       /*page table entry를 생성한 후 페이지 테이블에 넣어준다*/
       pte = page_table_entry_alloc(upage, frame, writable);
-      pte->filename = filename;
       page_table_add(pte);
       //printf("page table added\n");
 
        /* Add the page to the process's address space. */
-      if (!install_page (upage, frame->addr, writable)) 
+      if (!install_page (upage, frame->kaddr, writable)) 
         {
           printf("install page failed\n");
           page_table_delete(pte);
@@ -562,6 +557,32 @@ load_segment (char *filename, struct file *file, off_t ofs, uint8_t *upage,
     }
     //printf("file to page done\n");
     return true;
+#endif
+
+#ifdef VMs
+  struct page_table_entry *pte;
+
+  file_seek (file, ofs);
+  while (read_bytes > 0 || zero_bytes > 0) 
+    {
+      /* Do calculate how to fill this page.
+         We will read PAGE_READ_BYTES bytes from FILE
+         and zero the final PAGE_ZERO_BYTES bytes. */
+      size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
+      size_t page_zero_bytes = PGSIZE - page_read_bytes;
+
+      /* Get a page of memory. */
+      pte = page_table_entry_file(upage, file, ofs, page_read_bytes, page_zero_bytes, writable);
+      page_table_add(pte);
+      printf("load_segment - page table added file\n");
+      /* Advance. */
+      read_bytes -= page_read_bytes;
+      zero_bytes -= page_zero_bytes;
+      upage += PGSIZE;
+      ofs += page_read_bytes;
+    }
+    printf("file read 1\n");
+  return true;
 
 #else
   file_seek (file, ofs);
@@ -622,7 +643,6 @@ setup_stack (void **esp)
   frame = frame_alloc();
 
   if(frame == NULL){
-        //printf("setup_stack - frame_alloc failed\n");
     if(swap_out()){
       frame = frame_alloc();
     }
@@ -630,35 +650,19 @@ setup_stack (void **esp)
       return false;
     }
   }
-
-  //printf("setup_stack - frame_alloced\n");
-
-  frame_set_accessable(frame, true);
-  frame_set_uaddr(frame, upage);
-  frame_add(frame);
-
-  //printf("setup_stack - frame_set\n");
+  frame_to_table(frame, upage);
 
   /*page table entry를 생성한 후 페이지 테이블에 넣어준다*/
   pte = page_table_entry_alloc(upage, frame, true);
   page_table_add(pte);
 
-  //printf("setup_stack - pte_set\n");
-
-  success = install_page(upage, frame->addr, true);
+  success = install_page(upage, frame->kaddr, true);
   if(success)
     *esp = PHYS_BASE;
   else
     /*install_page 함수가 success가 안되면 페이지 테이블에서 제거하고 
     프레임 테이블에서도 제거해준다*/
     page_table_delete(pte);
-
-  if(pte->frame == NULL){
-    if(pte->swap_table_index == -1){
-      printf("setup_stack - error pte\n");
-      exit(-1);
-    }
-  }
 
   return success;
 
@@ -794,10 +798,10 @@ argv_put_stack(char *parse,int count, void **esp)
 }
 
 bool
-stack_growth(void *addr){
+stack_growth(void *vaddr){
   struct frame *frame;
   struct page_table_entry *pte;
-  void *upage = pg_round_down(addr);
+  void *upage = pg_round_down(vaddr);
   bool success = false;
 
   //printf("stack_growth start\n");
@@ -813,30 +817,19 @@ stack_growth(void *addr){
     else{
       return false;
     }
-  }
-
-  
-  frame_set_accessable(frame, true);
-  frame_set_uaddr(frame, upage);
-  frame_add(frame);
+  }  
+  frame_to_table(frame, upage);
 
   /*page table entry를 생성한 후 페이지 테이블에 넣어준다*/
   pte = page_table_entry_alloc(upage, frame, true);
   page_table_add(pte);
 
-  success = install_page(upage, frame->addr, true);
+  success = install_page(upage, frame->kaddr, true);
       
   if(!success)
     /*install_page 함수가 success가 안되면 페이지 테이블에서 제거하고 
     프레임 테이블에서도 제거해준다*/
     page_table_delete(pte);
-
-  if(pte->frame == NULL){
-    if(pte->swap_table_index == -1){
-      printf("stack - error pte\n");
-      exit(-1);
-    }
-  }
 
   return success;
 }

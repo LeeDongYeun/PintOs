@@ -80,16 +80,13 @@ swap_in(struct page_table_entry *pte){
         }
   	}
 
-  	swap_delete(frame->addr, pte->swap_table_index);
+  	swap_delete(frame->kaddr, pte->swap_table_index);
 	pte->swap_table_index = -1;
 
-	
-	frame_set_accessable(frame, true);
-	frame_set_uaddr(frame, pte->vaddr);
-	frame_add(frame);
+	frame_to_table(frame, pte->vaddr);
 
 	pte->frame = frame;
-	success = install_page(pte->vaddr, frame->addr, pte->writable);
+	success = install_page(pte->vaddr, frame->kaddr, pte->writable);
       if(!success){
       	page_table_delete(pte);
       	return false;
@@ -115,13 +112,13 @@ swap_out(){
 		return false;
 	} 
 
-	victim_pte = page_table_find(victim_frame->uaddr, victim_frame->thread);
+	victim_pte = page_table_find(victim_frame->vaddr, victim_frame->thread);
 	if(victim_pte == NULL){
 		printf("NULL PTE\n");
 		return false;
 	}
 
-	swap_table_index = swap_add(victim_frame->addr);
+	swap_table_index = swap_add(victim_frame->kaddr);
 
 	//printf("swap_out - swap_table_index = %d\n", swap_table_index);
 
@@ -133,12 +130,11 @@ swap_out(){
 	victim_pte->swap_table_index = swap_table_index;
 	victim_pte->frame = NULL;
 
-	pagedir_clear_page(victim_frame->thread->pagedir, victim_frame->uaddr);
+	pagedir_clear_page(victim_frame->thread->pagedir, victim_frame->vaddr);
 
-	if(victim_frame->filename != NULL)
-		printf("swap_out victim_frame filename = %s\n", victim_frame->filename);
 
 	frame_free(victim_frame);
 
+	//printf("swaped out\n");
 	return true;
 }

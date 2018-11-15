@@ -50,23 +50,23 @@ page_table_destroy(struct hash *pt){
 }
 
 struct page_table_entry *
-page_table_entry_alloc(void *uaddr, struct frame *frame, bool writable){
+page_table_entry_alloc(void *vaddr, struct frame *frame, bool writable){
 	struct page_table_entry *pte = malloc(sizeof(struct page_table_entry));
 	if(pte == NULL){
 		printf("page_table_entry_alloc failed\n");
 		return false;
 	}
-	pte->type = PTE_SWAP;
-	pte->vaddr = pg_round_down(uaddr);
+	pte->type = PTE_FRAME;
+	pte->vaddr = pg_round_down(vaddr);
 	pte->frame = frame;
 	pte->swap_table_index = -1;
 	pte->writable = writable;
 
 	return pte;
 }
-/*
+
 struct page_table_entry *
-page_table_entry_file(void *uaddr, struct file *file, int offset, 
+page_table_entry_file(void *vaddr, struct file *file, int offset, 
 						int read_bytes, int zero_bytes, bool writable){
 	struct page_table_entry *pte = malloc(sizeof(struct page_table_entry));
 	if(pte == NULL){
@@ -74,7 +74,7 @@ page_table_entry_file(void *uaddr, struct file *file, int offset,
 		return false;
 	}
 	pte->type = PTE_FILE;
-	pte->vaddr = pg_round_down(uaddr);
+	pte->vaddr = pg_round_down(vaddr);
 	pte->swap_table_index = -1;
 	pte->writable = writable;
 
@@ -84,7 +84,7 @@ page_table_entry_file(void *uaddr, struct file *file, int offset,
 	pte->zero_bytes = zero_bytes;
 
 	return pte;
-}*/
+}
 
 void
 page_table_add(struct page_table_entry *pte){

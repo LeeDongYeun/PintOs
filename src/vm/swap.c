@@ -135,6 +135,6 @@ swap_out(){
 
 	frame_free(victim_frame);
 
-	//printf("swaped out\n");
+	printf("swaped out vaddr = %x\n", victim_pte->vaddr);
 	return true;
 }

@@ -500,7 +500,7 @@ load_segment (char *filename, struct file *file, off_t ofs, uint8_t *upage,
   ASSERT (ofs % PGSIZE == 0);
 
   
-#ifdef VM
+#ifdef VMd
   struct frame *frame;
   struct page_table_entry *pte;
   
@@ -539,7 +539,7 @@ load_segment (char *filename, struct file *file, off_t ofs, uint8_t *upage,
       /*page table entry를 생성한 후 페이지 테이블에 넣어준다*/
       pte = page_table_entry_alloc(upage, frame, writable);
       page_table_add(pte);
-      //printf("page table added\n");
+      printf("load_segment - page table added file, vaddr = %x\n", upage);
 
        /* Add the page to the process's address space. */
       if (!install_page (upage, frame->kaddr, writable)) 
@@ -559,7 +559,7 @@ load_segment (char *filename, struct file *file, off_t ofs, uint8_t *upage,
     return true;
 #endif
 
-#ifdef VMs
+#ifdef VM
   struct page_table_entry *pte;
 
   file_seek (file, ofs);
@@ -574,14 +574,14 @@ load_segment (char *filename, struct file *file, off_t ofs, uint8_t *upage,
       /* Get a page of memory. */
       pte = page_table_entry_file(upage, file, ofs, page_read_bytes, page_zero_bytes, writable);
       page_table_add(pte);
-      printf("load_segment - page table added file\n");
+      printf("load_segment - page table added file, vaddr = %x\n", upage);
       /* Advance. */
       read_bytes -= page_read_bytes;
       zero_bytes -= page_zero_bytes;
       upage += PGSIZE;
       ofs += page_read_bytes;
     }
-    printf("file read 1\n");
+   // printf("file read 1\n");
   return true;
 
 #else
@@ -804,7 +804,7 @@ stack_growth(void *vaddr){
   void *upage = pg_round_down(vaddr);
   bool success = false;
 
-  //printf("stack_growth start\n");
+  printf("stack_growth start\n");
 
   /*프레임을 생성한 후 프레임 리스트에 추가한다*/
   frame = frame_alloc();
@@ -831,5 +831,6 @@ stack_growth(void *vaddr){
     프레임 테이블에서도 제거해준다*/
     page_table_delete(pte);
 
+  printf("stack_growth done\n");
   return success;
 }

@@ -86,18 +86,18 @@ void set_accessable_buff(char *start, char *end, bool boolean){
 			set_accessable(start, boolean);
 }
 
-/*
+
 void
 check_pointer(void *vaddr, void *esp){
-	printf("check_pointer\n");
+	//printf("check_pointer\n");
 	struct page_table_entry *pte;
 	bool success = false;
 	
-	if (!is_user_vaddr(vaddr) || vaddr < 0x08048000){
+	if (is_kernel_vaddr(vaddr) || vaddr < 0x08048000){
       exit(-1);
     }
 
-    pte = page_table_find(vaddr);
+    pte = page_table_find(vaddr, thread_current());
 
   	if(pte == NULL){
     	if(vaddr < esp - 32){
@@ -118,14 +118,16 @@ check_pointer(void *vaddr, void *esp){
 
 void
 check_string(const char *str, void *esp){
+	printf("check_string\n");
 	for (; check_pointer((void *) str, esp), *str; str++); 
 }
 
 void
 check_buffer(const char *buff, unsigned size, void *esp){
+	printf("check_buffer\n");
 	while (size--)
     check_pointer((void *) (buff++), esp); 
-}*/
+}
 
 
 
@@ -146,7 +148,7 @@ static void
 syscall_handler (struct intr_frame *f) 
 {	
 	int esp_val = (get_argv(f->esp));
-	//check_pointer(f->esp, f->esp);
+	check_pointer(f->esp, f->esp);
 
 	//printf("handler esp = %p", f->esp);
 	//printf("esp_val = %d\n", esp_val);
@@ -192,12 +194,12 @@ syscall_handler (struct intr_frame *f)
 	  		break;
 
 	  	case SYS_READ:
-	  		//check_buffer((void *)get_argv((int *)f->esp+2), (unsigned)get_argv((int *)f->esp+3), f->esp);
+	  		check_buffer((void *)get_argv((int *)f->esp+2), (unsigned)get_argv((int *)f->esp+3), f->esp);
 	  		f -> eax = read((int)get_argv((int *)f->esp+1), (void *)get_argv((int *)f->esp+2), (unsigned)get_argv((int *)f->esp+3));
 	  		break;
 
 	  	case SYS_WRITE:
-	  		//check_buffer((void *)get_argv((int *)f->esp+2), (unsigned)get_argv((int *)f->esp+3), f->esp);
+	  		check_buffer((void *)get_argv((int *)f->esp+2), (unsigned)get_argv((int *)f->esp+3), f->esp);
 	  		f -> eax = write((int)get_argv((int *)f->esp+1), (void *)get_argv((int *)f->esp+2), (unsigned)get_argv((int *)f->esp+3));
 	  		break;
 
@@ -236,6 +238,7 @@ get_file(int fd){
 			return file_descriptor->file;
 		}
 	}
+	printf("get_file - do not exist file\n");
 
 	return NULL;
 }
@@ -379,7 +382,7 @@ fd 의 값이 0 이면 키보드로부터 버퍼에 값을 읽어오고,
 */
 int
 read(int fd, void *buffer, unsigned size){
-	//printf("SYS_READ\n");
+	printf("SYS_READ\n");
 	int result;
 	
 	//set_accessable_buff(buffer, buffer + size, false);
@@ -413,7 +416,7 @@ read(int fd, void *buffer, unsigned size){
 
 int
 write(int fd, const void *buffer, unsigned size){
-	
+	printf("SYS_WRITE\n");
 	int result;
 
 	//set_accessable_buff(buffer, buffer + size, false);
@@ -434,9 +437,10 @@ write(int fd, const void *buffer, unsigned size){
 			result = file_write(file, buffer, size);
 			lock_release(&lock_filesys);
 		}
-		//printf("syscall_handler - SYS_WRITE -result = %d\n", result);
+		printf("syscall_handler - SYS_WRITE -result = %d\n", result);
 		
 	}
+	printf("syscall_handler - SYS_WRITE -result = %d\n", result);
 	//set_accessable_buff(buffer, buffer + size, true);
 
 	return result;

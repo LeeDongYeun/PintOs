@@ -23,6 +23,7 @@ static long long page_fault_cnt;
 static void kill (struct intr_frame *);
 static void page_fault (struct intr_frame *);
 bool page_fault_process(void *fault_addr);
+bool lazy_load_file(struct page_table_entry *pte);
 
 /* Registers handlers for interrupts that can be caused by user
    programs.
@@ -169,7 +170,7 @@ page_fault (struct intr_frame *f)
     curr->esp = f->esp;
   }
 
-  //printf("page faulted. fault_addr = %p esp = %p tid = %d\n", fault_addr, curr->esp, curr->tid);
+  printf("page faulted. fault_addr = %p esp = %p tid = %d\n", fault_addr, curr->esp, curr->tid);
 
   /*읽기 전용 페이지에 쓰기를 시도할 경우*/
   if(!not_present){
@@ -212,7 +213,7 @@ page_fault_process(void *fault_addr){
   struct thread *curr = thread_current();
   void *check_page;
 
-    pte = page_table_find(fault_addr, curr);
+  pte = page_table_find(fault_addr, curr);
   //printf("adfasd\n");
 
   if(pte == NULL){
@@ -236,41 +237,14 @@ page_fault_process(void *fault_addr){
 
   else{
     //printf("swap needed\n");
-    if(pte->type == PTE_FRAME)
+    if(pte->type == PTE_FRAME){
       success = swap_in(pte);
+    }
     
     else if(pte->type == PTE_FILE){
-
-      frame = frame_alloc();
-
-      if(frame == NULL){
-        if(swap_out()){
-          frame = frame_alloc();
-        }
-        else{
-          return false;
-        }
-      }
-
-      if (file_read_at(pte->file, frame->kaddr, pte->read_bytes, pte->offset) 
-          != (int) pte->read_bytes){
-        printf("file didn't read\n");
-        frame_free(frame);
-        return false; 
-      }
-
-      memset(frame->kaddr + pte->read_bytes, 0, pte->zero_bytes);
-
-      if (!install_page (pte->vaddr, frame->kaddr, pte->writable)) {
-          free(frame);
-          return false; 
-        }
-
-      frame_to_table(frame, pte->vaddr);
-      success = true;
-
-      printf("page_fault - file read to frame\n");
-      }
+      success = lazy_load_file(pte);
+    }
+      
 
     if(!success){
       exit(-1);
@@ -278,4 +252,41 @@ page_fault_process(void *fault_addr){
   }
 
   return success;
+}
+
+bool
+lazy_load_file(struct page_table_entry *pte){
+  printf("lazy_load_file vaddr = %x\n", pte->vaddr);
+  struct frame *frame;
+
+  frame = frame_alloc();
+
+  if(frame == NULL){
+    if(swap_out()){
+      frame = frame_alloc();
+    }
+    else{
+      return false;
+    }
+  }
+
+  if (file_read_at(pte->file, frame->kaddr, pte->read_bytes, pte->offset) 
+          != (int) pte->read_bytes){
+        printf("file didn't read\n");
+        frame_free(frame);
+        return false; 
+      }
+
+  memset(frame->kaddr + pte->read_bytes, 0, pte->zero_bytes);
+
+  if (!install_page (pte->vaddr, frame->kaddr, pte->writable)){
+      free(frame);
+      return false; 
+  }
+
+  frame_to_table(frame, pte->vaddr);
+
+  //printf("page_fault - file read to frame\n");
+
+  return true;
 }

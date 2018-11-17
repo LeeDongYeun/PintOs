@@ -111,6 +111,8 @@ struct thread
     /*[project3]*/
     struct hash page_table;
     void *esp;
+    struct list mmap_list;
+    int map_id;
 
 
 #ifdef USERPROG

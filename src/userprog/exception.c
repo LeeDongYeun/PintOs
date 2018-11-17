@@ -170,7 +170,7 @@ page_fault (struct intr_frame *f)
     curr->esp = f->esp;
   }
 
-  printf("page faulted. fault_addr = %p esp = %p tid = %d\n", fault_addr, curr->esp, curr->tid);
+  //printf("page faulted. fault_addr = %p esp = %p tid = %d\n", fault_addr, curr->esp, curr->tid);
 
   /*읽기 전용 페이지에 쓰기를 시도할 경우*/
   if(!not_present){
@@ -256,7 +256,8 @@ page_fault_process(void *fault_addr){
 
 bool
 lazy_load_file(struct page_table_entry *pte){
-  printf("lazy_load_file vaddr = %x\n", pte->vaddr);
+  //printf("lazy_load_file vaddr = %x\n", pte->vaddr);
+  //printf("lazy load file addr = %x\n", pte->file);
   struct frame *frame;
 
   frame = frame_alloc();

@@ -86,6 +86,28 @@ page_table_entry_file(void *vaddr, struct file *file, int offset,
 	return pte;
 }
 
+struct page_table_entry *
+page_table_entry_mmap(void *vaddr, struct file *file, int offset, 
+						int read_bytes, int zero_bytes, bool writable){
+	struct page_table_entry *pte = malloc(sizeof(struct page_table_entry));
+	if(pte == NULL){
+		printf("page_table_entry_alloc failed\n");
+		return false;
+	}
+
+	pte->type = PTE_MMAP;
+	pte->vaddr = pg_round_down(vaddr);
+	pte->swap_table_index = -1;
+	pte->writable = writable;
+
+	pte->file = file;
+	pte->offset = offset;
+	pte->read_bytes = read_bytes;
+	pte->zero_bytes = zero_bytes;
+
+	return pte;
+}
+
 void
 page_table_add(struct page_table_entry *pte){
 	//ASSERT(thread_current()->page_table);

@@ -22,6 +22,10 @@
 #define MAX_STACK_SIZE (1<<23)
 #endif
 
+#ifndef mapid_t
+typedef int mapid_t;
+#endif
+
 typedef int pid_t;
 
 static void syscall_handler (struct intr_frame *);
@@ -39,6 +43,8 @@ int write(int fd, const void *buffer, unsigned size);
 void seek(int fd, unsigned position);
 unsigned tell(int fd);
 void close(int fd);
+mapid_t mmap(int fd, void *addr);
+void munmap(mapid_t mapping);
 
 struct file *get_file(int fd);
 
@@ -148,7 +154,7 @@ static void
 syscall_handler (struct intr_frame *f) 
 {	
 	int esp_val = (get_argv(f->esp));
-	check_pointer(f->esp, f->esp);
+	//check_pointer(f->esp, f->esp);
 
 	//printf("handler esp = %p", f->esp);
 	//printf("esp_val = %d\n", esp_val);
@@ -194,12 +200,12 @@ syscall_handler (struct intr_frame *f)
 	  		break;
 
 	  	case SYS_READ:
-	  		check_buffer((void *)get_argv((int *)f->esp+2), (unsigned)get_argv((int *)f->esp+3), f->esp);
+	  		//check_buffer((void *)get_argv((int *)f->esp+2), (unsigned)get_argv((int *)f->esp+3), f->esp);
 	  		f -> eax = read((int)get_argv((int *)f->esp+1), (void *)get_argv((int *)f->esp+2), (unsigned)get_argv((int *)f->esp+3));
 	  		break;
 
 	  	case SYS_WRITE:
-	  		check_buffer((void *)get_argv((int *)f->esp+2), (unsigned)get_argv((int *)f->esp+3), f->esp);
+	  		//check_buffer((void *)get_argv((int *)f->esp+2), (unsigned)get_argv((int *)f->esp+3), f->esp);
 	  		f -> eax = write((int)get_argv((int *)f->esp+1), (void *)get_argv((int *)f->esp+2), (unsigned)get_argv((int *)f->esp+3));
 	  		break;
 
@@ -213,6 +219,12 @@ syscall_handler (struct intr_frame *f)
 
 	  	case SYS_CLOSE:
 	  		close((int)get_argv((int *)f->esp+1));
+	  		break;
+	  	case SYS_MMAP:
+	  		f->eax = mmap((int)get_argv((int *)f->esp+1), (void *)get_argv((int *)f->esp+2));
+	  		break;
+	  	case SYS_MUNMAP:
+	  		munmap((mapid_t)get_argv((int *)f->esp+1));
 	  		break;
 	}
 	
@@ -238,7 +250,7 @@ get_file(int fd){
 			return file_descriptor->file;
 		}
 	}
-	printf("get_file - do not exist file\n");
+	//printf("get_file - do not exist file\n");
 
 	return NULL;
 }
@@ -382,7 +394,7 @@ fd 의 값이 0 이면 키보드로부터 버퍼에 값을 읽어오고,
 */
 int
 read(int fd, void *buffer, unsigned size){
-	printf("SYS_READ\n");
+	//printf("SYS_READ\n");
 	int result;
 	
 	//set_accessable_buff(buffer, buffer + size, false);
@@ -416,7 +428,7 @@ read(int fd, void *buffer, unsigned size){
 
 int
 write(int fd, const void *buffer, unsigned size){
-	printf("SYS_WRITE\n");
+	//printf("SYS_WRITE\n");
 	int result;
 
 	//set_accessable_buff(buffer, buffer + size, false);
@@ -437,10 +449,10 @@ write(int fd, const void *buffer, unsigned size){
 			result = file_write(file, buffer, size);
 			lock_release(&lock_filesys);
 		}
-		printf("syscall_handler - SYS_WRITE -result = %d\n", result);
+		//printf("syscall_handler - SYS_WRITE -result = %d\n", result);
 		
 	}
-	printf("syscall_handler - SYS_WRITE -result = %d\n", result);
+	//printf("syscall_handler - SYS_WRITE -result = %d\n", result);
 	//set_accessable_buff(buffer, buffer + size, true);
 
 	return result;
@@ -506,3 +518,68 @@ close(int fd){
 	}
 }
 
+
+
+mapid_t
+mmap(int fd, void *addr){
+	struct file *file;
+	int read_bytes, zero_bytes;
+	off_t offset = 0;
+	struct mmap_file *mmap_file;
+	struct page_table_entry *pte;
+
+	if(fd == 0 || fd == 1)
+		return -1;
+	if(addr == 0)
+		return -1;
+	if(addr != pg_round_down(addr))
+    	return -1;
+
+    file = get_file(fd);
+
+    if(!file)
+    	return -1;
+
+    read_bytes = file_length(file);
+    zero_bytes = read_bytes % PGSIZE;
+
+    if(file_length == 0)
+    	return -1;
+
+    mmap_file = (struct mmap_file *)malloc(sizeof (struct mmap_file));
+    if(mmap_file == NULL){
+    	//printf("mmap_file - malloc failed\n");
+    	return -1;
+    }
+
+    mmap_file->file = file_reopen(file);
+    mmap_file->map_id = thread_current()->map_id++;
+
+    while(read_bytes >0 || zero_bytes > 0){
+    	if(page_table_find(addr, thread_current()) != NULL){
+    		//printf("mmap - already exist on memory\n");
+    		exit(-1);
+    	}
+
+    	size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
+    	size_t page_zero_bytes = PGSIZE - page_read_bytes;
+
+    	pte = page_table_entry_mmap(addr, mmap_file->file, offset, page_read_bytes, page_zero_bytes, true);
+    	page_table_add(pte);
+
+    	read_bytes -= page_read_bytes;
+    	zero_bytes -= page_zero_bytes;
+    	addr += PGSIZE;
+    	offset += page_read_bytes;
+    }
+
+    list_push_back(&thread_current()->mmap_list, &mmap_file->elem);
+
+    return mmap_file->map_id;
+}
+
+void
+munmap(mapid_t mapping){
+
+	return -1;
+}

@@ -7,6 +7,7 @@
 enum pte_type{
 	PTE_FRAME,
 	PTE_FILE,
+	PTE_MMAP,
 };
 
 struct page_table_entry{
@@ -30,6 +31,8 @@ void page_table_init(struct hash *pt);
 void page_table_destroy(struct hash *pt);
 struct page_table_entry *page_table_entry_alloc(void *vaddr, struct frame *frame, bool writable);
 struct page_table_entry *page_table_entry_file(void *vaddr, struct file *file, int offset, 
+												int read_bytes, int zero_bytes, bool writable);
+struct page_table_entry *page_table_entry_mmap(void *vaddr, struct file *file, int offset, 
 												int read_bytes, int zero_bytes, bool writable);
 void page_table_add(struct page_table_entry *pte);
 void page_table_delete(struct page_table_entry *pte);

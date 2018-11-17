@@ -14,6 +14,7 @@ struct file_descriptor{
 struct mmap_file{
 	int map_id;
 	struct file *file;
+	struct list pte_list;
 	struct list_elem elem;
 
 };

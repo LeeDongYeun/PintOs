@@ -2,6 +2,7 @@
 #define VM_PAGE_H
 
 #include <hash.h>
+#include <list.h>
 #include "frame.h"
 
 enum pte_type{
@@ -23,6 +24,7 @@ struct page_table_entry{
 	int zero_bytes;
 
 	struct hash_elem elem;
+	struct list_elem mmap_elem;
 };
 
 

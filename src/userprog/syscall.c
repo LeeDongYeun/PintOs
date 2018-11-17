@@ -47,6 +47,7 @@ mapid_t mmap(int fd, void *addr);
 void munmap(mapid_t mapping);
 
 struct file *get_file(int fd);
+struct mmap_file *get_mmap_file(int map_id);
 
 static int 
 get_user (const uint8_t *uaddr)
@@ -251,6 +252,25 @@ get_file(int fd){
 		}
 	}
 	//printf("get_file - do not exist file\n");
+
+	return NULL;
+}
+
+struct mmap_file *
+get_mmap_file(int map_id){
+
+	struct thread *curr = thread_current();
+	struct list_elem *e;
+	struct mmap_file *mmap_file;
+
+	ASSERT(&curr->mmap_list != NULL);
+
+	for(e = list_begin(&curr->mmap_list); e != list_end(&curr->mmap_list); e = list_next(e)){
+		mmap_file = list_entry(e, struct mmap_file, elem);
+		if(map_id == mmap_file->map_id){
+			return mmap_file;
+		}
+	}
 
 	return NULL;
 }
@@ -554,10 +574,13 @@ mmap(int fd, void *addr){
 
     mmap_file->file = file_reopen(file);
     mmap_file->map_id = thread_current()->map_id++;
+    list_push_back(&thread_current()->mmap_list, &mmap_file->elem);
+    list_init(&mmap_file->pte_list);
 
     while(read_bytes >0 || zero_bytes > 0){
     	if(page_table_find(addr, thread_current()) != NULL){
     		//printf("mmap - already exist on memory\n");
+
     		exit(-1);
     	}
 
@@ -566,6 +589,7 @@ mmap(int fd, void *addr){
 
     	pte = page_table_entry_mmap(addr, mmap_file->file, offset, page_read_bytes, page_zero_bytes, true);
     	page_table_add(pte);
+    	list_push_back(&mmap_file->pte_list, &pte->mmap_elem);
 
     	read_bytes -= page_read_bytes;
     	zero_bytes -= page_zero_bytes;
@@ -573,13 +597,19 @@ mmap(int fd, void *addr){
     	offset += page_read_bytes;
     }
 
-    list_push_back(&thread_current()->mmap_list, &mmap_file->elem);
-
     return mmap_file->map_id;
 }
 
 void
 munmap(mapid_t mapping){
+
+	struct mmap_file *mmap_file = get_mmap_file(mapping);
+	if(mmap_file == NULL)
+		return;
+
+	
+
+
 
 	return -1;
 }

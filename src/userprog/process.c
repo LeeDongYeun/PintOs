@@ -177,12 +177,12 @@ process_exit (void)
 
 #ifdef VM
   struct mmap_file *mmap_file;
-  page_table_destroy(&curr->page_table);
 
-  for(ee = list_begin(&curr->mmap_list); ee != list_end(&curr->mmap_list); ee = list_next(ee)){
-    mmap_file = list_entry(ee, struct mmap_file, elem);
-    munmap(mmap_file->map_id);
-  }
+  //for(ee = list_begin(&curr->mmap_list); ee != list_end(&curr->mmap_list); ee = list_next(ee)){
+  //  mmap_file = list_entry(ee, struct mmap_file, elem);
+  //  munmap(mmap_file->map_id);
+  //}
+  page_table_destroy(&curr->page_table);
 
 #endif
   /* Destroy the current process's page directory and switch back

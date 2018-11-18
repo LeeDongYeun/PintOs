@@ -24,6 +24,7 @@ static void kill (struct intr_frame *);
 static void page_fault (struct intr_frame *);
 bool page_fault_process(void *fault_addr);
 bool lazy_load_file(struct page_table_entry *pte);
+bool lazy_load_mmap(struct page_table_entry *pte);
 
 /* Registers handlers for interrupts that can be caused by user
    programs.
@@ -244,6 +245,10 @@ page_fault_process(void *fault_addr){
     else if(pte->type == PTE_FILE){
       success = lazy_load_file(pte);
     }
+
+    else if(pte->type == PTE_MMAP){
+      success = lazy_load_mmap(pte);
+    }
       
 
     if(!success){
@@ -288,6 +293,44 @@ lazy_load_file(struct page_table_entry *pte){
   frame_to_table(frame, pte->vaddr);
 
   //printf("page_fault - file read to frame\n");
+
+  return true;
+}
+
+bool
+lazy_load_mmap(struct page_table_entry *pte){
+  struct frame *frame;
+
+  frame = frame_alloc();
+
+  if(frame == NULL){
+    if(swap_out()){
+      frame = frame_alloc();
+    }
+    else{
+      return false;
+    }
+  }
+
+  //printf("vaddr = %x kaddr = %x read_bytes = %d offset = %d\n", pte->vaddr, frame->kaddr, pte->read_bytes, pte->offset);
+
+  if (file_read_at(pte->file, frame->kaddr, pte->read_bytes, pte->offset) 
+          != (int) pte->read_bytes){
+        printf("mmap didn't read\n");
+        frame_free(frame);
+        return false; 
+      }
+
+  memset(frame->kaddr + pte->read_bytes, 0, pte->zero_bytes);
+
+  if (!install_page (pte->vaddr, frame->kaddr, pte->writable)){
+      free(frame);
+      printf("lazy_load_mmap - install_page failed\n");
+      return false; 
+  }
+
+  frame_to_table(frame, pte->vaddr);
+  frame_set_accessable(frame, false);
 
   return true;
 }

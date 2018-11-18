@@ -561,7 +561,9 @@ mmap(int fd, void *addr){
     	return -1;
 
     read_bytes = file_length(file);
-    zero_bytes = read_bytes % PGSIZE;
+    zero_bytes = PGSIZE - (read_bytes % PGSIZE);
+
+    //printf("read_bytes = %d zero_bytes = %d\n", read_bytes, zero_bytes);
 
     if(file_length == 0)
     	return -1;
@@ -586,6 +588,7 @@ mmap(int fd, void *addr){
 
     	size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
     	size_t page_zero_bytes = PGSIZE - page_read_bytes;
+    	//printf("page_read_bytes = %d, page_zero_bytes = %d\n", page_read_bytes, page_zero_bytes);
 
     	pte = page_table_entry_mmap(addr, mmap_file->file, offset, page_read_bytes, page_zero_bytes, true);
     	page_table_add(pte);
@@ -595,6 +598,8 @@ mmap(int fd, void *addr){
     	zero_bytes -= page_zero_bytes;
     	addr += PGSIZE;
     	offset += page_read_bytes;
+
+    	//printf("read_bytes = %d zero_bytes = %d addr = %x offset = %d\n", read_bytes,zero_bytes,addr,offset);
     }
 
     return mmap_file->map_id;
@@ -603,13 +608,31 @@ mmap(int fd, void *addr){
 void
 munmap(mapid_t mapping){
 
+	struct list_elem *e;
+	struct page_table_entry *pte;
+	struct thread *curr = thread_current();
 	struct mmap_file *mmap_file = get_mmap_file(mapping);
-	if(mmap_file == NULL)
+	if(mmap_file == NULL){
+		printf("munmap get mmap_file failed\n");
 		return;
+	}
 
-	
+	ASSERT(&mmap_file->pte_list != NULL);
 
+	for(e = list_begin(&mmap_file->pte_list); e != list_end(&mmap_file->pte_list); ){
+		
+		pte = list_entry(e, struct page_table_entry, mmap_elem);
+		if(pagedir_is_dirty(curr->pagedir, pte->vaddr)){
 
+			if(file_write_at(pte->file, pte->vaddr, pte->read_bytes, pte->offset)
+					!= (int) pte->read_bytes){
+				printf("munmap - file didn't write\n");
+			}
+			page_table_delete(pte);
+		}
+		e = list_remove(e);
+	}
 
-	return -1;
+	list_remove(&mmap_file->elem);
+	free(mmap_file);
 }

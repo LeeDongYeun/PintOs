@@ -639,18 +639,13 @@ munmap(mapid_t mapping){
 					!= (int) pte->read_bytes){
 				printf("munmap - file didn't write\n");
 			}
-			e = list_remove(e);
-			//printf("list_remove\n");
-			page_table_delete(pte);
-			//printf("page_table_delete\n");
 		}
-		else{
-			e = list_remove(e);
-		}
-		//printf("adf\n");
-		
+		e = list_remove(e);
+		page_table_delete(pte);
 	}
 
 	list_remove(&mmap_file->elem);
+	//printf("list_remove(&mmap_file->elem)\n");
 	free(mmap_file);
+	//printf("free(mmap_file)\n");
 }

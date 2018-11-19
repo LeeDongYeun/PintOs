@@ -589,8 +589,7 @@ mmap(int fd, void *addr){
     while(read_bytes >0 || zero_bytes > 0){
     	if(page_table_find(addr, thread_current()) != NULL){
     		//printf("mmap - already exist on memory\n");
-
-    		exit(-1);
+			return -1;
     	}
 
     	size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;

@@ -177,11 +177,18 @@ process_exit (void)
 
 #ifdef VM
   struct mmap_file *mmap_file;
-
-  //for(ee = list_begin(&curr->mmap_list); ee != list_end(&curr->mmap_list); ee = list_next(ee)){
-  //  mmap_file = list_entry(ee, struct mmap_file, elem);
-  //  munmap(mmap_file->map_id);
-  //}
+  int map_id;
+  for(map_id = 1;map_id <curr->map_id; map_id++){
+    mmap_file = get_mmap_file(map_id);
+    if(mmap_file != NULL)
+      munmap(map_id);
+  }
+  /*
+  for(ee = list_begin(&curr->mmap_list); ee != list_end(&curr->mmap_list); ){
+    mmap_file = list_entry(ee, struct mmap_file, elem);
+    ee = list_remove(ee);
+    free(mmap_file);
+  }*/
   page_table_destroy(&curr->page_table);
 
 #endif

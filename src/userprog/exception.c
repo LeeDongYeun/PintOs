@@ -237,7 +237,6 @@ page_fault_process(void *fault_addr){
   }
 
   else{
-    //printf("swap needed\n");
     if(pte->type == PTE_FRAME){
       success = swap_in(pte);
     }

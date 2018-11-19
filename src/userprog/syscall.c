@@ -120,7 +120,10 @@ check_pointer(void *vaddr, void *esp){
     	if(!success){
       		exit(-1);
     	}
-  }
+  	}
+  	else{
+  		printf("pte - vaddr %x\n", pte->vaddr);
+  	}
 }
 
 void
@@ -325,12 +328,14 @@ create(const char *file, unsigned initial_size){
 	//printf("SYS_CREATE\n");
 	bool result;
 
+	//printf("file = %s initial_size = %d\n", file, initial_size);
 	if(file==NULL)
 		exit(-1);
 
-	lock_acquire(&lock_filesys);
+	//lock_acquire(&lock_filesys);
 	result = filesys_create(file, initial_size);
-	lock_release(&lock_filesys);
+	//lock_release(&lock_filesys);
+	//printf("result = %d\n", result);
 
 	return result;
 }
@@ -542,6 +547,7 @@ close(int fd){
 
 mapid_t
 mmap(int fd, void *addr){
+	//printf("SYS_MMAP\n");
 	struct file *file;
 	int read_bytes, zero_bytes;
 	off_t offset = 0;
@@ -629,15 +635,19 @@ munmap(mapid_t mapping){
 		//printf("vaddr = %x read_bytes = %d offset = %d\n", pte->vaddr, pte->read_bytes, pte->offset);
 		//printf("dirty = %d\n", pagedir_is_dirty(curr->pagedir, pte->vaddr));
 		if(pagedir_is_dirty(curr->pagedir, pte->vaddr)){
-			printf("vaddr = %x read_bytes = %d offset = %d\n", pte->vaddr, pte->read_bytes, pte->offset);
+			//printf("vaddr = %x read_bytes = %d offset = %d\n", pte->vaddr, pte->read_bytes, pte->offset);
 			if(file_write_at(pte->file, pte->vaddr, pte->read_bytes, pte->offset)
 					!= (int) pte->read_bytes){
 				printf("munmap - file didn't write\n");
 			}
+			e = list_remove(e);
 			page_table_delete(pte);
 		}
+		else{
+			e = list_remove(e);
+		}
 		//printf("adf\n");
-		e = list_remove(e);
+		
 	}
 
 	list_remove(&mmap_file->elem);

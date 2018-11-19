@@ -120,7 +120,7 @@ page_table_add(struct page_table_entry *pte){
 
 void
 page_table_delete(struct page_table_entry *pte){
-	printf("page_table_delete - pte->vaddr = %p\n", pte->vaddr);
+	//printf("page_table_delete - pte->vaddr = %p\n", pte->vaddr);
 	//ASSERT(thread_current()->page_table != NULL);
 
 	hash_delete(&thread_current()->page_table, &pte->elem);

@@ -288,7 +288,7 @@ lazy_load_file(struct page_table_entry *pte){
       free(frame);
       return false; 
   }
-
+  pte->frame =frame;
   frame_to_table(frame, pte->vaddr);
 
   //printf("page_fault - file read to frame\n");
@@ -329,6 +329,7 @@ lazy_load_mmap(struct page_table_entry *pte){
   }
   //pagedir_set_dirty(thread_current()->pagedir, pte->vaddr, false);
 
+  pte->frame = frame;
   frame_to_table(frame, pte->vaddr);
   frame_set_accessable(frame, false);
 

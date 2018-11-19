@@ -605,7 +605,7 @@ mmap(int fd, void *addr){
     	addr += PGSIZE;
     	offset += page_read_bytes;
 
-    	printf("read_bytes = %d zero_bytes = %d addr = %x offset = %d\n", read_bytes,zero_bytes,addr,offset);
+    	//printf("read_bytes = %d zero_bytes = %d addr = %x offset = %d\n", read_bytes,zero_bytes,addr,offset);
     }
 
     return mmap_file->map_id;
@@ -623,7 +623,7 @@ munmap(mapid_t mapping){
 		printf("munmap get mmap_file failed\n");
 		return;
 	}
-	printf("map_id = %d\n", mmap_file->map_id);
+	//printf("map_id = %d\n", mmap_file->map_id);
 	struct file *file = mmap_file->file;
 
 	ASSERT(&mmap_file->pte_list != NULL);
@@ -634,13 +634,13 @@ munmap(mapid_t mapping){
 		//printf("vaddr = %x read_bytes = %d offset = %d\n", pte->vaddr, pte->read_bytes, pte->offset);
 		//printf("dirty = %d\n", pagedir_is_dirty(curr->pagedir, pte->vaddr));
 		if(pagedir_is_dirty(curr->pagedir, pte->vaddr)){
-			printf("vaddr = %x read_bytes = %d offset = %d\n", pte->vaddr, pte->read_bytes, pte->offset);
+			//printf("vaddr = %x read_bytes = %d offset = %d\n", pte->vaddr, pte->read_bytes, pte->offset);
 			if(file_write_at(pte->file, pte->vaddr, pte->read_bytes, pte->offset)
 					!= (int) pte->read_bytes){
 				printf("munmap - file didn't write\n");
 			}
 			e = list_remove(e);
-			printf("list_remove\n");
+			//printf("list_remove\n");
 			page_table_delete(pte);
 			//printf("page_table_delete\n");
 		}

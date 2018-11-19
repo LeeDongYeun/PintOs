@@ -120,12 +120,12 @@ page_table_add(struct page_table_entry *pte){
 
 void
 page_table_delete(struct page_table_entry *pte){
-	printf("page_table_delete - pte->vaddr = %p\n", pte->vaddr);
+	//printf("page_table_delete - pte->vaddr = %p\n", pte->vaddr);
 	//ASSERT(thread_current()->page_table != NULL);
 
 	hash_delete(&thread_current()->page_table, &pte->elem);
 	if(pte->frame != NULL){
-		printf("page_table_delete - frame is not null\n");
+		//printf("page_table_delete - frame is not null\n");
 		frame_free(pte->frame);
 	}
 	//printf("page_table_delete - frame NULL\n");

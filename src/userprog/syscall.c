@@ -571,7 +571,7 @@ mmap(int fd, void *addr){
 
     //printf("read_bytes = %d zero_bytes = %d\n", read_bytes, zero_bytes);
 
-    if(file_length == 0)
+    if(read_bytes == 0)
     	return -1;
 
     mmap_file = (struct mmap_file *)malloc(sizeof (struct mmap_file));

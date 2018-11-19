@@ -68,11 +68,15 @@ frame_to_table(struct frame *frame, void *vaddr){
 
 void
 frame_free(struct frame *frame){
-	lock_acquire(&lock_frame);
+	//lock_acquire(&lock_frame);
+	printf("frame_free\n");
 	list_remove(&frame->elem);
+	printf("frame_free - list removed\n");
 	palloc_free_page(frame->kaddr);
+	printf("frame_free - palloc_free_page\n");
 	free(frame);
-	lock_release(&lock_frame);
+	printf("frame_free - free(frame)\n");
+	//lock_release(&lock_frame);
 }
 
 struct frame *

@@ -296,7 +296,8 @@ exit(int status)
 
 pid_t
 exec(const char *cmd_line){
-	//printf("SYS_EXEC\n");
+	printf("SYS_EXEC\n");
+	printf("cmd_line = %s\n", cmd_line);
 	int tid;
 	struct thread *child_process;
 
@@ -319,16 +320,16 @@ exec(const char *cmd_line){
 int
 wait(pid_t pid)
 {	
-	//printf("SYS_WAIT\n");
+	printf("SYS_WAIT\n");
 	return process_wait(pid);
 }
 
 bool
 create(const char *file, unsigned initial_size){
-	//printf("SYS_CREATE\n");
+	printf("SYS_CREATE\n");
 	bool result;
 
-	//printf("file = %s initial_size = %d\n", file, initial_size);
+	printf("file = %s initial_size = %d\n", file, initial_size);
 	if(file==NULL)
 		exit(-1);
 
@@ -359,7 +360,8 @@ file_descriptor라는 구조체를 저장한다. 그 후 fd를 증가시켜 준�
 */
 int
 open(const char *file){
-	//printf("SYS_OPEN\n");
+	printf("SYS_OPEN\n");
+	printf("file = %s\n", file);
 	if(file ==NULL)
 		return -1;
 	int result;
@@ -453,7 +455,7 @@ read(int fd, void *buffer, unsigned size){
 
 int
 write(int fd, const void *buffer, unsigned size){
-	//printf("SYS_WRITE\n");
+	printf("SYS_WRITE\n");
 	int result;
 
 	//set_accessable_buff(buffer, buffer + size, false);
@@ -547,7 +549,7 @@ close(int fd){
 
 mapid_t
 mmap(int fd, void *addr){
-	//printf("SYS_MMAP\n");
+	printf("SYS_MMAP\n");
 	struct file *file;
 	int read_bytes, zero_bytes;
 	off_t offset = 0;
@@ -569,7 +571,7 @@ mmap(int fd, void *addr){
     read_bytes = file_length(file);
     zero_bytes = PGSIZE - (read_bytes % PGSIZE);
 
-    //printf("read_bytes = %d zero_bytes = %d\n", read_bytes, zero_bytes);
+    printf("read_bytes = %d zero_bytes = %d\n", read_bytes, zero_bytes);
 
     if(read_bytes == 0)
     	return -1;
@@ -584,7 +586,7 @@ mmap(int fd, void *addr){
     mmap_file->map_id = thread_current()->map_id++;
     list_push_back(&thread_current()->mmap_list, &mmap_file->elem);
     list_init(&mmap_file->pte_list);
-    //printf("mmap - mmap_file map_id = %d\n", mmap_file->map_id);
+    printf("mmap - mmap_file map_id = %d\n", mmap_file->map_id);
 
     while(read_bytes >0 || zero_bytes > 0){
     	if(page_table_find(addr, thread_current()) != NULL){
@@ -605,7 +607,7 @@ mmap(int fd, void *addr){
     	addr += PGSIZE;
     	offset += page_read_bytes;
 
-    	//printf("read_bytes = %d zero_bytes = %d addr = %x offset = %d\n", read_bytes,zero_bytes,addr,offset);
+    	printf("read_bytes = %d zero_bytes = %d addr = %x offset = %d\n", read_bytes,zero_bytes,addr,offset);
     }
 
     return mmap_file->map_id;

@@ -311,7 +311,7 @@ lazy_load_mmap(struct page_table_entry *pte){
     }
   }
 
-  //printf("lazy_load_mmap - vaddr = %x kaddr = %x read_bytes = %d offset = %d\n", pte->vaddr, frame->kaddr, pte->read_bytes, pte->offset);
+  printf("lazy_load_mmap -thread = %d vaddr = %x kaddr = %x read_bytes = %d offset = %d\n",thread_current()->tid, pte->vaddr, frame->kaddr, pte->read_bytes, pte->offset);
 
   if (file_read_at(pte->file, frame->kaddr, pte->read_bytes, pte->offset) 
           != (int) pte->read_bytes){
@@ -332,6 +332,8 @@ lazy_load_mmap(struct page_table_entry *pte){
   pte->frame = frame;
   frame_to_table(frame, pte->vaddr);
   frame_set_accessable(frame, false);
+
+  printf("lazy_load_mmap done\n");
 
   return true;
 }

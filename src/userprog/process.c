@@ -172,10 +172,13 @@ process_exit (void)
     file_close(file_descriptor->file);
     //free(file_descriptor);
   }
+  printf("process_exit - before\n");
   file_close(curr->file);
-  //printf("process_exit - file closed\n");
+  printf("process_exit - file closed\n");
 
 #ifdef VM
+
+
   struct mmap_file *mmap_file;
   int map_id;
   for(map_id = 1;map_id <curr->map_id; map_id++){
@@ -183,7 +186,7 @@ process_exit (void)
     if(mmap_file != NULL)
       munmap(map_id);
   }
-  printf("mmap_file unmap done\n");
+  //printf("mmap_file unmap done\n");
   /*
   for(ee = list_begin(&curr->mmap_list); ee != list_end(&curr->mmap_list); ){
     mmap_file = list_entry(ee, struct mmap_file, elem);
@@ -531,7 +534,7 @@ load_segment (char *filename, struct file *file, off_t ofs, uint8_t *upage,
       //printf("filename = %s\n", filename);
       frame = frame_alloc();
       if(frame == NULL){
-        printf("load_segment - frame_alloc failed\n");
+        //printf("load_segment - frame_alloc failed\n");
         if(swap_out()){
           frame = frame_alloc();
         }
@@ -659,7 +662,7 @@ setup_stack (void **esp)
   frame = frame_alloc();
 
   if(frame == NULL){
-    printf("setup_stack - swap_out\n");
+    //printf("setup_stack - swap_out\n");
     if(swap_out()){
       frame = frame_alloc();
     }
@@ -827,7 +830,7 @@ stack_growth(void *vaddr){
   frame = frame_alloc();
 
   if(frame == NULL){
-    printf("stack_growth - frame_alloc failed\n");
+    //printf("stack_growth - frame_alloc failed\n");
     if(swap_out()){
       frame = frame_alloc();
     }

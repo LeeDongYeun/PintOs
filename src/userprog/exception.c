@@ -9,6 +9,7 @@
 #include "userprog/pagedir.h"
 #include "threads/palloc.h"
 #include "threads/synch.h"
+#include "userprog/syscall.h"
 
 #ifdef VM
 #include "vm/page.h"
@@ -225,7 +226,7 @@ page_fault_process(void *fault_addr){
   //printf("adfasd\n");
 
   if(pte == NULL){
-   printf("you should make stack expand\n");
+   //printf("you should make stack expand\n");
     if(fault_addr < curr->esp - 32){
       //printf("fault_addr = %x curr->esp - 32 = %x\n", fault_addr, curr->esp-32);
       //printf("fault1\n");
@@ -246,7 +247,7 @@ page_fault_process(void *fault_addr){
   else{
     pte->accessable = false;
     if(pte->type == PTE_FRAME){
-      printf("swap_in\n");
+      //printf("swap_in\n");
       success = swap_in(pte);
     }
     
@@ -255,7 +256,7 @@ page_fault_process(void *fault_addr){
     }
 
     else if(pte->type == PTE_MMAP){
-      printf("lazy_load_mmap\n");
+      //printf("lazy_load_mmap\n");
       success = lazy_load_mmap(pte);
     }
       
@@ -277,6 +278,7 @@ lazy_load_file(struct page_table_entry *pte){
   frame = frame_alloc();
 
   if(frame == NULL){
+    //printf("lazy_load_file -swap_out\n");
     if(swap_out()){
       frame = frame_alloc();
     }
@@ -309,12 +311,12 @@ lazy_load_file(struct page_table_entry *pte){
 
 bool
 lazy_load_mmap(struct page_table_entry *pte){
-  printf("lazy_load_mmap -thread = %d vaddr = %x read_bytes = %d zero_bytes = %d offset = %d\n",thread_current()->tid, pte->vaddr, pte->read_bytes, pte->zero_bytes, pte->offset);
+  //printf("lazy_load_mmap -thread = %d vaddr = %x read_bytes = %d zero_bytes = %d offset = %d\n",thread_current()->tid, pte->vaddr, pte->read_bytes, pte->zero_bytes, pte->offset);
 
 
   if(pte->loaded){
-    printf("already loaded\n");
-    printf("pagedir_get_page = %x\n", pagedir_get_page(thread_current()->pagedir, pte->vaddr));
+    //printf("already loaded\n");
+    //printf("pagedir_get_page = %x\n", pagedir_get_page(thread_current()->pagedir, pte->vaddr));
     return false;
   }
   struct frame *frame;
@@ -322,7 +324,7 @@ lazy_load_mmap(struct page_table_entry *pte){
   frame = frame_alloc();
 
   if(frame == NULL){
-    printf("lazy_load_mmap - swap_out\n");
+    //printf("lazy_load_mmap - swap_out\n");
     if(swap_out()){
       frame = frame_alloc();
     }
@@ -331,14 +333,16 @@ lazy_load_mmap(struct page_table_entry *pte){
     }
   }
 
-  printf("lazy_load_mmap -thread = %d vaddr = %x kaddr = %x read_bytes = %d offset = %d\n",thread_current()->tid, pte->vaddr, frame->kaddr, pte->read_bytes, pte->offset);
-
+  //printf("lazy_load_mmap -thread = %d vaddr = %x kaddr = %x read_bytes = %d offset = %d\n",thread_current()->tid, pte->vaddr, frame->kaddr, pte->read_bytes, pte->offset);
+  lock_acquire(&lock_filesys);
   if (file_read_at(pte->file, frame->kaddr, pte->read_bytes, pte->offset) 
           != (int) pte->read_bytes){
         printf("mmap didn't read\n");
         //frame_free(frame);
+      lock_release(&lock_filesys);
         return false; 
       }
+  lock_release(&lock_filesys);
 
   memset(frame->kaddr + pte->read_bytes, 0, pte->zero_bytes);
 
@@ -347,7 +351,7 @@ lazy_load_mmap(struct page_table_entry *pte){
       printf("lazy_load_mmap - install_page failed\n");
       return false; 
   }
-  printf("pagedir_get_page = %x\n", pagedir_get_page(thread_current()->pagedir, pte->vaddr));
+  //printf("pagedir_get_page = %x\n", pagedir_get_page(thread_current()->pagedir, pte->vaddr));
   //pagedir_set_dirty(thread_current()->pagedir, pte->vaddr, false);
 
   pte->frame = frame;
@@ -357,7 +361,7 @@ lazy_load_mmap(struct page_table_entry *pte){
   frame->vaddr = pte->vaddr;
   frame->accessable = false;
 
-  printf("lazy_load_mmap done\n");
+  //printf("lazy_load_mmap done\n");
 
   return true;
 }

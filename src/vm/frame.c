@@ -105,7 +105,7 @@ struct frame *
 frame_replacement_select(){
 	ASSERT(!list_empty(&frame_table));
 
-	printf("frame_replacement_select\n");
+	//printf("frame_replacement_select\n");
 
 	struct list_elem *e = list_begin(&frame_table);
 	struct frame *f;
@@ -115,7 +115,7 @@ frame_replacement_select(){
 		f = list_entry(e, struct frame, elem);
 		pte = page_table_find(f->vaddr, thread_current());
 
-		printf("f->thread->tid = %d\n", f->thread->tid);
+		//printf("f->thread->tid = %d\n", f->thread->tid);
 		//printf("f->addr %x\n", f->addr);
 		
 		if(f->thread->pagedir != NULL){

@@ -71,7 +71,7 @@ swap_in(struct page_table_entry *pte){
 	frame = frame_alloc();
 
 	if(frame == NULL){
-    	//printf("swap_in - frame_alloc failed\n");
+    	//printf("swap_in - swap_out\n");
     	if(swap_out()){
           frame = frame_alloc();
         }
@@ -122,7 +122,7 @@ swap_out(){
 
 	swap_table_index = swap_add(victim_frame->kaddr);
 
-	printf("swap out type = %d\n", (int)victim_pte->type);
+	//printf("swap out type = %d\n", (int)victim_pte->type);
 
 	if(swap_table_index == -2){
 		printf("swap_out BITMAP_ERROR\n");
@@ -131,7 +131,7 @@ swap_out(){
 
 	victim_pte->swap_table_index = swap_table_index;
 	victim_pte->frame = NULL;
-	printf("swaped out vaddr = %x kaddr = %x\n", victim_pte->vaddr, victim_frame->kaddr);
+	//printf("swaped out vaddr = %x kaddr = %x\n", victim_pte->vaddr, victim_frame->kaddr);
 	pagedir_clear_page(victim_frame->thread->pagedir, victim_frame->vaddr);
 
 

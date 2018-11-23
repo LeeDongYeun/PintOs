@@ -296,8 +296,8 @@ exit(int status)
 
 pid_t
 exec(const char *cmd_line){
-	printf("SYS_EXEC\n");
-	printf("cmd_line = %s\n", cmd_line);
+	//printf("SYS_EXEC\n");
+	//printf("cmd_line = %s\n", cmd_line);
 	int tid;
 	struct thread *child_process;
 
@@ -320,16 +320,16 @@ exec(const char *cmd_line){
 int
 wait(pid_t pid)
 {	
-	printf("SYS_WAIT\n");
+	//printf("SYS_WAIT\n");
 	return process_wait(pid);
 }
 
 bool
 create(const char *file, unsigned initial_size){
-	printf("SYS_CREATE\n");
+	//printf("SYS_CREATE\n");
 	bool result;
 
-	printf("file = %s initial_size = %d\n", file, initial_size);
+	//printf("file = %s initial_size = %d\n", file, initial_size);
 	if(file==NULL)
 		exit(-1);
 
@@ -343,7 +343,7 @@ create(const char *file, unsigned initial_size){
 
 bool
 remove(const char *file){
-	printf("SYS_REMOVE\n");
+	//printf("SYS_REMOVE\n");
 	bool result;
 
 	//check_pointer(file);
@@ -360,8 +360,8 @@ file_descriptor라는 구조체를 저장한다. 그 후 fd를 증가시켜 준�
 */
 int
 open(const char *file){
-	printf("SYS_OPEN\n");
-	printf("file = %s\n", file);
+	//printf("SYS_OPEN\n");
+	//printf("file = %s\n", file);
 	if(file ==NULL)
 		return -1;
 	int result;
@@ -397,7 +397,7 @@ open(const char *file){
 */
 int
 filesize(int fd){
-	printf("SYS_FILESIZE\n");
+	//printf("SYS_FILESIZE\n");
 	int result;
 
 	lock_acquire(&lock_filesys);
@@ -421,7 +421,7 @@ fd 의 값이 0 이면 키보드로부터 버퍼에 값을 읽어오고,
 */
 int
 read(int fd, void *buffer, unsigned size){
-	printf("SYS_READ\n");
+	//printf("SYS_READ\n");
 	int result;
 	
 	//set_accessable_buff(buffer, buffer + size, false);
@@ -455,7 +455,7 @@ read(int fd, void *buffer, unsigned size){
 
 int
 write(int fd, const void *buffer, unsigned size){
-	printf("SYS_WRITE\n");
+	//printf("SYS_WRITE\n");
 	int result;
 
 	//set_accessable_buff(buffer, buffer + size, false);
@@ -487,7 +487,7 @@ write(int fd, const void *buffer, unsigned size){
 
 void
 seek(int fd, unsigned position){
-	printf("SYS_SEEK\n");
+	//printf("SYS_SEEK\n");
 	lock_acquire(&lock_filesys);
 	struct file * file = get_file(fd);
 
@@ -500,7 +500,7 @@ seek(int fd, unsigned position){
 
 unsigned
 tell(int fd){
-	printf("SYS_TELL\n");
+	//printf("SYS_TELL\n");
 	off_t result;
 
 	lock_acquire(&lock_filesys);
@@ -523,7 +523,7 @@ thread의 file_list에서 제거해주고, file 또한 닫는다.
 */
 void
 close(int fd){
-	printf("SYS_CLOSE\n");
+	//printf("SYS_CLOSE\n");
 	struct thread *curr = thread_current();
 	struct list_elem *e;
 	struct file_descriptor *file_descriptor;
@@ -549,7 +549,7 @@ close(int fd){
 
 mapid_t
 mmap(int fd, void *addr){
-	printf("SYS_MMAP\n");
+	//printf("SYS_MMAP\n");
 	struct file *file;
 	int read_bytes, zero_bytes;
 	off_t offset = 0;
@@ -615,7 +615,7 @@ mmap(int fd, void *addr){
 
 void
 munmap(mapid_t mapping){
-	printf("SYS_MUNMAP\n");
+	//printf("SYS_MUNMAP\n");
 
 	struct list_elem *e;
 	struct page_table_entry *pte;

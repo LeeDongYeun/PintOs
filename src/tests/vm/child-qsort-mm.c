@@ -19,10 +19,7 @@ main (int argc UNUSED, char *argv[])
 
   CHECK ((handle = open (argv[1])) > 1, "open \"%s\"", argv[1]);
   CHECK (mmap (handle, p) != MAP_FAILED, "mmap \"%s\"", argv[1]);
-  printf("child-qsort-mm - mmap done\n");
   qsort_bytes (p, 1024 * 128);
   
-  printf("child-qsort-mm done need return\n");
-
   return 80;
 }

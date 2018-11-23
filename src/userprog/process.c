@@ -172,9 +172,9 @@ process_exit (void)
     file_close(file_descriptor->file);
     //free(file_descriptor);
   }
-  printf("process_exit - before\n");
+  //printf("process_exit - before\n");
   file_close(curr->file);
-  printf("process_exit - file closed\n");
+  //printf("process_exit - file closed\n");
 
 #ifdef VM
 

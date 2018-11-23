@@ -8,6 +8,7 @@
 #include "userprog/process.h"
 #include "userprog/pagedir.h"
 #include "threads/palloc.h"
+#include "threads/synch.h"
 
 #ifdef VM
 #include "vm/page.h"
@@ -25,6 +26,8 @@ static void page_fault (struct intr_frame *);
 bool page_fault_process(void *fault_addr);
 bool lazy_load_file(struct page_table_entry *pte);
 bool lazy_load_mmap(struct page_table_entry *pte);
+
+struct lock lock_page_fault;
 
 /* Registers handlers for interrupts that can be caused by user
    programs.
@@ -73,6 +76,8 @@ exception_init (void)
      We need to disable interrupts for page faults because the
      fault address is stored in CR2 and needs to be preserved. */
   intr_register_int (14, 0, INTR_OFF, page_fault, "#PF Page-Fault Exception");
+
+  lock_init(&lock_page_fault);
 }
 
 /* Prints exception statistics. */
@@ -175,17 +180,19 @@ page_fault (struct intr_frame *f)
 
   /*읽기 전용 페이지에 쓰기를 시도할 경우*/
   if(!not_present){
-    //printf("write to read only page\n");
+    printf("write to read only page\n");
     exit(-1);
   }
 
   /*페이지가 커널 가상 메모리에 있는 경우*/
   if(is_kernel_vaddr(fault_addr) || fault_addr <0x08048000){
-    //printf("is kernel vaddr\n ");
+    printf("is kernel vaddr\n ");
     exit(-1);
   }
 
+  lock_acquire(&lock_page_fault);
   success = page_fault_process(fault_addr);
+  lock_release(&lock_page_fault);
   if(!success)
     exit(-1);
 
@@ -218,7 +225,7 @@ page_fault_process(void *fault_addr){
   //printf("adfasd\n");
 
   if(pte == NULL){
-   //printf("you should make stack expand\n");
+   printf("you should make stack expand\n");
     if(fault_addr < curr->esp - 32){
       //printf("fault_addr = %x curr->esp - 32 = %x\n", fault_addr, curr->esp-32);
       //printf("fault1\n");
@@ -237,7 +244,9 @@ page_fault_process(void *fault_addr){
   }
 
   else{
+    pte->accessable = false;
     if(pte->type == PTE_FRAME){
+      printf("swap_in\n");
       success = swap_in(pte);
     }
     
@@ -246,10 +255,11 @@ page_fault_process(void *fault_addr){
     }
 
     else if(pte->type == PTE_MMAP){
+      printf("lazy_load_mmap\n");
       success = lazy_load_mmap(pte);
     }
       
-
+    pte->accessable = true;
     if(!success){
       exit(-1);
     }
@@ -289,6 +299,7 @@ lazy_load_file(struct page_table_entry *pte){
       return false; 
   }
   pte->frame =frame;
+  pte->type = PTE_FRAME;
   frame_to_table(frame, pte->vaddr);
 
   //printf("page_fault - file read to frame\n");
@@ -298,11 +309,20 @@ lazy_load_file(struct page_table_entry *pte){
 
 bool
 lazy_load_mmap(struct page_table_entry *pte){
+  printf("lazy_load_mmap -thread = %d vaddr = %x read_bytes = %d zero_bytes = %d offset = %d\n",thread_current()->tid, pte->vaddr, pte->read_bytes, pte->zero_bytes, pte->offset);
+
+
+  if(pte->loaded){
+    printf("already loaded\n");
+    printf("pagedir_get_page = %x\n", pagedir_get_page(thread_current()->pagedir, pte->vaddr));
+    return false;
+  }
   struct frame *frame;
 
   frame = frame_alloc();
 
   if(frame == NULL){
+    printf("lazy_load_mmap - swap_out\n");
     if(swap_out()){
       frame = frame_alloc();
     }
@@ -327,11 +347,15 @@ lazy_load_mmap(struct page_table_entry *pte){
       printf("lazy_load_mmap - install_page failed\n");
       return false; 
   }
+  printf("pagedir_get_page = %x\n", pagedir_get_page(thread_current()->pagedir, pte->vaddr));
   //pagedir_set_dirty(thread_current()->pagedir, pte->vaddr, false);
 
   pte->frame = frame;
-  frame_to_table(frame, pte->vaddr);
-  frame_set_accessable(frame, false);
+  pte->loaded = true;
+  //pte->type = PTE_FRAME;
+  frame_add(frame);
+  frame->vaddr = pte->vaddr;
+  frame->accessable = false;
 
   printf("lazy_load_mmap done\n");
 

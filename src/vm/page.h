@@ -6,9 +6,9 @@
 #include "frame.h"
 
 enum pte_type{
-	PTE_FRAME,
-	PTE_FILE,
-	PTE_MMAP,
+	PTE_FRAME=0,
+	PTE_FILE=1,
+	PTE_MMAP=2,
 };
 
 struct page_table_entry{
@@ -17,6 +17,8 @@ struct page_table_entry{
 	struct frame *frame;
 	int swap_table_index;
 	bool writable;
+	bool accessable;
+	bool loaded;
 	
 	struct file *file;
 	int offset;

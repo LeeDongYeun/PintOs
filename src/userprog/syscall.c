@@ -343,7 +343,7 @@ create(const char *file, unsigned initial_size){
 
 bool
 remove(const char *file){
-	//printf("SYS_REMOVE\n");
+	printf("SYS_REMOVE\n");
 	bool result;
 
 	//check_pointer(file);
@@ -397,7 +397,7 @@ open(const char *file){
 */
 int
 filesize(int fd){
-	//printf("SYS_FILESIZE\n");
+	printf("SYS_FILESIZE\n");
 	int result;
 
 	lock_acquire(&lock_filesys);
@@ -421,7 +421,7 @@ fd 의 값이 0 이면 키보드로부터 버퍼에 값을 읽어오고,
 */
 int
 read(int fd, void *buffer, unsigned size){
-	//printf("SYS_READ\n");
+	printf("SYS_READ\n");
 	int result;
 	
 	//set_accessable_buff(buffer, buffer + size, false);
@@ -487,7 +487,7 @@ write(int fd, const void *buffer, unsigned size){
 
 void
 seek(int fd, unsigned position){
-	//printf("SYS_SEEK\n");
+	printf("SYS_SEEK\n");
 	lock_acquire(&lock_filesys);
 	struct file * file = get_file(fd);
 
@@ -500,7 +500,7 @@ seek(int fd, unsigned position){
 
 unsigned
 tell(int fd){
-	//printf("SYS_TELL\n");
+	printf("SYS_TELL\n");
 	off_t result;
 
 	lock_acquire(&lock_filesys);
@@ -523,7 +523,7 @@ thread의 file_list에서 제거해주고, file 또한 닫는다.
 */
 void
 close(int fd){
-	//printf("SYS_CLOSE\n");
+	printf("SYS_CLOSE\n");
 	struct thread *curr = thread_current();
 	struct list_elem *e;
 	struct file_descriptor *file_descriptor;
@@ -571,7 +571,7 @@ mmap(int fd, void *addr){
     read_bytes = file_length(file);
     zero_bytes = PGSIZE - (read_bytes % PGSIZE);
 
-    printf("read_bytes = %d zero_bytes = %d\n", read_bytes, zero_bytes);
+    //printf("read_bytes = %d zero_bytes = %d\n", read_bytes, zero_bytes);
 
     if(read_bytes == 0)
     	return -1;
@@ -586,7 +586,7 @@ mmap(int fd, void *addr){
     mmap_file->map_id = thread_current()->map_id++;
     list_push_back(&thread_current()->mmap_list, &mmap_file->elem);
     list_init(&mmap_file->pte_list);
-    printf("mmap - mmap_file map_id = %d\n", mmap_file->map_id);
+    //printf("mmap - mmap_file map_id = %d\n", mmap_file->map_id);
 
     while(read_bytes >0 || zero_bytes > 0){
     	if(page_table_find(addr, thread_current()) != NULL){
@@ -607,7 +607,7 @@ mmap(int fd, void *addr){
     	addr += PGSIZE;
     	offset += page_read_bytes;
 
-    	printf("read_bytes = %d zero_bytes = %d addr = %x offset = %d\n", read_bytes,zero_bytes,addr,offset);
+    	//printf("read_bytes = %d zero_bytes = %d addr = %x offset = %d\n", read_bytes,zero_bytes,addr,offset);
     }
 
     return mmap_file->map_id;
@@ -615,7 +615,7 @@ mmap(int fd, void *addr){
 
 void
 munmap(mapid_t mapping){
-	//printf("SYS_MUNMAP\n");
+	printf("SYS_MUNMAP\n");
 
 	struct list_elem *e;
 	struct page_table_entry *pte;
@@ -647,7 +647,7 @@ munmap(mapid_t mapping){
 	}
 
 	list_remove(&mmap_file->elem);
-	//printf("list_remove(&mmap_file->elem)\n");
+	printf("list_remove(&mmap_file->elem)\n");
 	free(mmap_file);
-	//printf("free(mmap_file)\n");
+	printf("free(mmap_file)\n");
 }

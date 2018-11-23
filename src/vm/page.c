@@ -31,8 +31,14 @@ page_hash_destroy_func(struct hash_elem *e, void *aux UNUSED){
 	ASSERT(e != NULL);
 
 	struct page_table_entry *pte = hash_entry(e, struct page_table_entry, elem);
+	
 	if(pte->frame != NULL)
 		frame_free(pte->frame);
+
+	if(pte->swap_table_index != -1){
+		swap_free(pte->swap_table_index);
+	}
+
 	pagedir_clear_page(thread_current()->pagedir, pte->vaddr);
 	free(pte);
 }
@@ -61,6 +67,7 @@ page_table_entry_alloc(void *vaddr, struct frame *frame, bool writable){
 	pte->frame = frame;
 	pte->swap_table_index = -1;
 	pte->writable = writable;
+	pte->accessable = true;
 
 	return pte;
 }
@@ -77,6 +84,7 @@ page_table_entry_file(void *vaddr, struct file *file, int offset,
 	pte->vaddr = pg_round_down(vaddr);
 	pte->swap_table_index = -1;
 	pte->writable = writable;
+	pte->accessable = true;
 
 	pte->file = file;
 	pte->offset = offset;
@@ -99,6 +107,8 @@ page_table_entry_mmap(void *vaddr, struct file *file, int offset,
 	pte->vaddr = pg_round_down(vaddr);
 	pte->swap_table_index = -1;
 	pte->writable = writable;
+	pte->accessable = true;
+	pte->loaded = false;
 
 	pte->file = file;
 	pte->offset = offset;
@@ -120,8 +130,8 @@ page_table_add(struct page_table_entry *pte){
 
 void
 page_table_delete(struct page_table_entry *pte){
-	//printf("page_table_delete - pte->vaddr = %p\n", pte->vaddr);
-	//ASSERT(thread_current()->page_table != NULL);
+	printf("page_table_delete - pte->vaddr = %p\n", pte->vaddr);
+	ASSERT(&thread_current()->page_table != NULL);
 
 	hash_delete(&thread_current()->page_table, &pte->elem);
 	if(pte->frame != NULL){

@@ -4,6 +4,7 @@
 #include "threads/malloc.h"
 #include "threads/vaddr.h"
 #include "userprog/pagedir.h"
+#include "vm/page.h"
 
 
 void
@@ -104,15 +105,17 @@ struct frame *
 frame_replacement_select(){
 	ASSERT(!list_empty(&frame_table));
 
-	//printf("frame_replacement_select\n");
+	printf("frame_replacement_select\n");
 
-	struct list_elem *e = list_end(&frame_table);
+	struct list_elem *e = list_begin(&frame_table);
 	struct frame *f;
+	struct page_table_entry *pte;
 
 	while(true){
 		f = list_entry(e, struct frame, elem);
+		pte = page_table_find(f->vaddr, thread_current());
 
-		//printf("f->thread->tid = %d ", f->thread->tid);
+		printf("f->thread->tid = %d\n", f->thread->tid);
 		//printf("f->addr %x\n", f->addr);
 		
 		if(f->thread->pagedir != NULL){
@@ -126,7 +129,7 @@ frame_replacement_select(){
 				pagedir_set_accessed(f->thread->pagedir, f->vaddr, false);
 			}
 			else if(f->accessable == true)
-				//lock_release(&lock_frame);
+				//printf("kaddr = %p frame->vaddr = %p pte->vaddr = %p\n", f->kaddr, f->vaddr, pte->vaddr);
 				return f;
 		}
 

@@ -520,7 +520,7 @@ load_segment (char *filename, struct file *file, off_t ofs, uint8_t *upage,
   ASSERT (ofs % PGSIZE == 0);
 
   
-#ifdef VM
+#ifdef VMd
   struct frame *frame;
   struct page_table_entry *pte;
   
@@ -579,7 +579,7 @@ load_segment (char *filename, struct file *file, off_t ofs, uint8_t *upage,
     return true;
 #endif
 
-#ifdef VMd
+#ifdef VM
   struct page_table_entry *pte;
 
   file_seek (file, ofs);
@@ -594,8 +594,8 @@ load_segment (char *filename, struct file *file, off_t ofs, uint8_t *upage,
       /* Get a page of memory. */
       pte = page_table_entry_file(upage, file, ofs, page_read_bytes, page_zero_bytes, writable);
       page_table_add(pte);
-      printf("load_segment - page table added file, vaddr = %x\n", upage);
-      printf("load_segment - file = %p\n", file);
+      //printf("load_segment - page table added file, vaddr = %x\n", upage);
+      //printf("load_segment - file = %p\n", file);
       /* Advance. */
       read_bytes -= page_read_bytes;
       zero_bytes -= page_zero_bytes;

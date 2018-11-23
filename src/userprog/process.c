@@ -27,7 +27,7 @@ static bool load (const char *cmdline, void (**eip) (void), void **esp);
 bool install_page (void *upage, void *kpage, bool writable);
 int argument_count(char *parse);
 void argv_put_stack(char *parse,int count, void **esp);
-void stack_growth(void *addr);
+bool stack_growth(void *vaddr);
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
@@ -160,7 +160,7 @@ process_exit (void)
   struct thread *curr = thread_current ();
   uint32_t *pd;
 
-  struct list_elem *e;
+  struct list_elem *e, *ee;
   struct file_descriptor *file_descriptor;
 
   ASSERT (&curr->file_list != NULL);
@@ -172,11 +172,29 @@ process_exit (void)
     file_close(file_descriptor->file);
     //free(file_descriptor);
   }
+  //printf("process_exit - before\n");
   file_close(curr->file);
   //printf("process_exit - file closed\n");
 
 #ifdef VM
+
+
+  struct mmap_file *mmap_file;
+  int map_id;
+  for(map_id = 1;map_id <curr->map_id; map_id++){
+    mmap_file = get_mmap_file(map_id);
+    if(mmap_file != NULL)
+      munmap(map_id);
+  }
+  //printf("mmap_file unmap done\n");
+  /*
+  for(ee = list_begin(&curr->mmap_list); ee != list_end(&curr->mmap_list); ){
+    mmap_file = list_entry(ee, struct mmap_file, elem);
+    ee = list_remove(ee);
+    free(mmap_file);
+  }*/
   page_table_destroy(&curr->page_table);
+
 #endif
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
@@ -278,7 +296,7 @@ struct Elf32_Phdr
 
 static bool setup_stack (void **esp);
 static bool validate_segment (const struct Elf32_Phdr *, struct file *);
-static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
+static bool load_segment (char *filename, struct file *file, off_t ofs, uint8_t *upage,
                           uint32_t read_bytes, uint32_t zero_bytes,
                           bool writable);
 
@@ -315,13 +333,19 @@ load (const char *cmd_line, void (**eip) (void), void **esp)
     goto done;
   process_activate ();
 
+  //printf("pagdir created tid = %d\n", t->tid);
+
   /* Open executable file. */
+  lock_acquire(&lock_filesys);
   file = filesys_open (file_name);
+  lock_release(&lock_filesys);
   if (file == NULL) 
     {
       printf ("load: %s: open failed\n", file_name);
       goto done; 
     }
+
+  //printf("load after file open\n");
 
   /* Read and verify executable header. */
   if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
@@ -339,6 +363,7 @@ load (const char *cmd_line, void (**eip) (void), void **esp)
     }
 
   /* Read program headers. */
+  //printf("ehdr.e_phnum = %d\n", ehdr.e_phnum);
   file_ofs = ehdr.e_phoff;
   for (i = 0; i < ehdr.e_phnum; i++) 
     {
@@ -387,7 +412,7 @@ load (const char *cmd_line, void (**eip) (void), void **esp)
                   read_bytes = 0;
                   zero_bytes = ROUND_UP (page_offset + phdr.p_memsz, PGSIZE);
                 }
-              if (!load_segment (file, file_page, (void *) mem_page,
+              if (!load_segment (file_name, file, file_page, (void *) mem_page,
                                  read_bytes, zero_bytes, writable))
                 goto done;
             }
@@ -396,7 +421,6 @@ load (const char *cmd_line, void (**eip) (void), void **esp)
           break;
         }
     }
-    
 
   t->file = file;
   file_deny_write(file);
@@ -488,13 +512,100 @@ validate_segment (const struct Elf32_Phdr *phdr, struct file *file)
    Return true if successful, false if a memory allocation error
    or disk read error occurs. */
 static bool
-load_segment (struct file *file, off_t ofs, uint8_t *upage,
+load_segment (char *filename, struct file *file, off_t ofs, uint8_t *upage,
               uint32_t read_bytes, uint32_t zero_bytes, bool writable) 
 {
   ASSERT ((read_bytes + zero_bytes) % PGSIZE == 0);
   ASSERT (pg_ofs (upage) == 0);
   ASSERT (ofs % PGSIZE == 0);
 
+  
+#ifdef VM
+  struct frame *frame;
+  struct page_table_entry *pte;
+  
+  file_seek (file, ofs);
+  while (read_bytes > 0 || zero_bytes > 0) 
+    {
+      /* Do calculate how to fill this page.
+         We will read PAGE_READ_BYTES bytes from FILE
+         and zero the final PAGE_ZERO_BYTES bytes. */
+      size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
+      size_t page_zero_bytes = PGSIZE - page_read_bytes;
+
+      //printf("filename = %s\n", filename);
+      frame = frame_alloc();
+      if(frame == NULL){
+        //printf("load_segment - frame_alloc failed\n");
+        if(swap_out()){
+          frame = frame_alloc();
+        }
+        else{
+          return false;
+        }
+      }
+
+      if (file_read (file, frame->kaddr, page_read_bytes) != (int) page_read_bytes)
+        {
+          frame_free(frame);
+          return false; 
+        }
+      //printf("frame->addr = %x page_read_bytes = %x\n",frame->addr, page_read_bytes);
+      //printf("dst = %x size = %d\n", frame->addr + page_read_bytes, page_zero_bytes);
+      memset(frame->kaddr + page_read_bytes, 0, page_zero_bytes);
+      
+      frame_to_table(frame, upage);
+
+      /*page table entry를 생성한 후 페이지 테이블에 넣어준다*/
+      pte = page_table_entry_alloc(upage, frame, writable);
+      page_table_add(pte);
+      //printf("load_segment - page table added file, vaddr = %x\n", upage);
+
+       /* Add the page to the process's address space. */
+      if (!install_page (upage, frame->kaddr, writable)) 
+        {
+          printf("install page failed\n");
+          page_table_delete(pte);
+          return false; 
+        }
+
+      /* Advance. */
+      read_bytes -= page_read_bytes;
+      zero_bytes -= page_zero_bytes;
+      upage += PGSIZE;
+      //printf("read_bytes = %d zero_bytes = %d\n", read_bytes, zero_bytes);
+    }
+    //printf("file to page done\n");
+    return true;
+#endif
+
+#ifdef VMd
+  struct page_table_entry *pte;
+
+  file_seek (file, ofs);
+  while (read_bytes > 0 || zero_bytes > 0) 
+    {
+      /* Do calculate how to fill this page.
+         We will read PAGE_READ_BYTES bytes from FILE
+         and zero the final PAGE_ZERO_BYTES bytes. */
+      size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
+      size_t page_zero_bytes = PGSIZE - page_read_bytes;
+
+      /* Get a page of memory. */
+      pte = page_table_entry_file(upage, file, ofs, page_read_bytes, page_zero_bytes, writable);
+      page_table_add(pte);
+      printf("load_segment - page table added file, vaddr = %x\n", upage);
+      printf("load_segment - file = %p\n", file);
+      /* Advance. */
+      read_bytes -= page_read_bytes;
+      zero_bytes -= page_zero_bytes;
+      upage += PGSIZE;
+      ofs += page_read_bytes;
+    }
+   // printf("file read 1\n");
+  return true;
+
+#else
   file_seek (file, ofs);
   while (read_bytes > 0 || zero_bytes > 0) 
     {
@@ -529,7 +640,10 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       zero_bytes -= page_zero_bytes;
       upage += PGSIZE;
     }
+    printf("file to page done\n");
   return true;
+
+#endif
 }
 
 /* Create a minimal stack by mapping a zeroed page at the top of
@@ -539,33 +653,43 @@ setup_stack (void **esp)
 {
   void *upage = ((uint8_t *) PHYS_BASE) - PGSIZE;
   bool success = false;
+  //printf("set stack\n");
 
 #ifdef VM
+  //printf("setup stack\n");
   struct frame *frame;
   struct page_table_entry *pte;
 
   /*프레임을 생성한 후 프레임 리스트에 추가한다*/
   frame = frame_alloc();
-  if(frame != NULL){
 
-    frame_add(frame);
-    frame_set_accessable(frame, true);
-
-    /*page table entry를 생성한 후 페이지 테이블에 넣어준다*/
-    pte = page_table_entry_alloc(upage, frame);
-    page_table_add(pte);
-
-    success = install_page(upage, frame->addr, true);
-    if(success)
-      *esp = PHYS_BASE;
-    else
-      /*install_page 함수가 success가 안되면 페이지 테이블에서 제거하고 
-      프레임 테이블에서도 제거해준다*/
-      page_table_delete(pte);
+  if(frame == NULL){
+    //printf("setup_stack - swap_out\n");
+    if(swap_out()){
+      frame = frame_alloc();
+    }
+    else{
+      return false;
+    }
   }
+  frame_to_table(frame, upage);
+
+  /*page table entry를 생성한 후 페이지 테이블에 넣어준다*/
+  pte = page_table_entry_alloc(upage, frame, true);
+  page_table_add(pte);
+
+  success = install_page(upage, frame->kaddr, true);
+  if(success)
+    *esp = PHYS_BASE;
+  else
+    /*install_page 함수가 success가 안되면 페이지 테이블에서 제거하고 
+    프레임 테이블에서도 제거해준다*/
+    page_table_delete(pte);
+
   return success;
 
 #else
+  //printf("no vm setup stack\n");
   uint8_t *kpage;
   kpage = palloc_get_page (PAL_USER | PAL_ZERO);
   if (kpage != NULL) 
@@ -695,34 +819,40 @@ argv_put_stack(char *parse,int count, void **esp)
   //printf("argv_put_stack - esp = %p\n", *esp);
 }
 
-void
-stack_growth(void *addr){
+bool
+stack_growth(void *vaddr){
   struct frame *frame;
   struct page_table_entry *pte;
-  void *upage = pg_round_down(addr);
+  void *upage = pg_round_down(vaddr);
   bool success = false;
 
   //printf("stack_growth start\n");
 
   /*프레임을 생성한 후 프레임 리스트에 추가한다*/
   frame = frame_alloc();
-  if(frame != NULL){
 
-    frame_add(frame);
-    frame_set_accessable(frame, true);
+  if(frame == NULL){
+    //printf("stack_growth - frame_alloc failed\n");
+    if(swap_out()){
+      frame = frame_alloc();
+    }
+    else{
+      return false;
+    }
+  }  
+  frame_to_table(frame, upage);
 
-    /*page table entry를 생성한 후 페이지 테이블에 넣어준다*/
-    pte = page_table_entry_alloc(upage, frame);
-    page_table_add(pte);
+  /*page table entry를 생성한 후 페이지 테이블에 넣어준다*/
+  pte = page_table_entry_alloc(upage, frame, true);
+  page_table_add(pte);
 
-    success = install_page(upage, frame->addr, true);
+  success = install_page(upage, frame->kaddr, true);
       
-    if(!success)
-      /*install_page 함수가 success가 안되면 페이지 테이블에서 제거하고 
-      프레임 테이블에서도 제거해준다*/
-      page_table_delete(pte);
-  }
+  if(!success)
+    /*install_page 함수가 success가 안되면 페이지 테이블에서 제거하고 
+    프레임 테이블에서도 제거해준다*/
+    page_table_delete(pte);
+
+  //printf("stack_growth done\n");
   return success;
-
 }
-

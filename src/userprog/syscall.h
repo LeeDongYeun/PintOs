@@ -11,6 +11,14 @@ struct file_descriptor{
 	struct list_elem elem;
 };
 
+struct mmap_file{
+	int map_id;
+	struct file *file;
+	struct list pte_list;
+	struct list_elem elem;
+
+};
+
 struct lock lock_filesys;
 
 #endif /* userprog/syscall.h */

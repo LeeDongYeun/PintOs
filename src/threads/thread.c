@@ -517,7 +517,9 @@ init_thread (struct thread *t, const char *name, int priority)
   t->file = NULL;
   t->load_status = false;
 
-  //page_table_init(&t->page_table);
+  /*project3*/
+  list_init(&t->mmap_list);
+  t->map_id = 1;
 
 }
 

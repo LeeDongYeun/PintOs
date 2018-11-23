@@ -336,7 +336,9 @@ load (const char *cmd_line, void (**eip) (void), void **esp)
   //printf("pagdir created tid = %d\n", t->tid);
 
   /* Open executable file. */
+  lock_acquire(&lock_filesys);
   file = filesys_open (file_name);
+  lock_release(&lock_filesys);
   if (file == NULL) 
     {
       printf ("load: %s: open failed\n", file_name);

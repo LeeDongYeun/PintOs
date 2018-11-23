@@ -301,6 +301,7 @@ lazy_load_file(struct page_table_entry *pte){
       return false; 
   }
   pte->frame =frame;
+  pte->loaded = true;
   pte->type = PTE_FRAME;
   frame_to_table(frame, pte->vaddr);
 
